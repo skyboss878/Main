@@ -1,0 +1,135 @@
+const express = require('express');
+const express = require("express");
+const router = express.Router();
+const User = require('../models/User');
+const PayPalService = require('../services/paypalService');
+const protect = require('../middleware/auth');
+
+// Raw body parser for webhook
+const rawBodyParser = express.raw({ type: 'application/json' });
+
+// Get subscription plans
+router.get('/plans', (req, res) => {
+  res.json(PayPalService.getPlans());
+});
+
+// Create subscription
+router.post('/subscribe', protect, async (req, res) => {
+  try {
+    const { planId } = req.body;
+    const user = await User.findById(req.user.id);
+
+    const plans = PayPalService.getPlans();
+    if (!plans[planId]) {
+      return res.status(400).json({ error: 'Invalid plan' });
+    }
+
+    const subscription = await PayPalService.createSubscription(
+      plans[planId].id,
+      user.email
+    );
+
+    // Update user with pending subscription
+    user.subscription.paypalSubscriptionId = subscription.id;
+    user.subscription.status = 'pending';
+    await user.save();
+
+    res.json({
+      subscriptionId: subscription.id,
+      approvalUrl: subscription.links.find(link => link.rel === 'approve').href
+    });
+  } catch (error) {
+    console.error('Subscription creation error:', error);
+    res.status(500).json({ error: 'Failed to create subscription' });
+  }
+});
+
+// Handle subscription approval
+router.post('/subscription/approve', protect, async (req, res) => {
+  try {
+    const { subscriptionId } = req.body;
+    const user = await User.findById(req.user.id);
+
+    if (user.subscription.paypalSubscriptionId !== subscriptionId) {
+      return res.status(400).json({ error: 'Invalid subscription' });
+    }
+
+    const subscriptionDetails = await PayPalService.getSubscriptionDetails(subscriptionId);
+
+    if (subscriptionDetails.status === 'ACTIVE') {
+      // Update user subscription
+      const plans = PayPalService.getPlans();
+      const plan = Object.values(plans).find(p => p.id === subscriptionDetails.plan_id);
+
+      user.subscription.type = plan ? Object.keys(plans).find(key => plans[key].id === plan.id) : 'pro';
+      user.subscription.status = 'active';
+      user.subscription.currentPeriodEnd = new Date(subscriptionDetails.billing_info.next_billing_time);
+      user.subscription.videoLimit = plan ? plan.videos : 50;
+      user.subscription.videosUsed = 0;
+
+      await user.save();
+
+      res.json({ message: 'Subscription activated successfully' });
+    } else {
+      res.status(400).json({ error: 'Subscription not active' });
+    }
+  } catch (error) {
+    console.error('Subscription approval error:', error);
+    res.status(500).json({ error: 'Failed to approve subscription' });
+  }
+});
+
+// Cancel subscription
+router.post('/subscription/cancel', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+
+    if (!user.subscription.paypalSubscriptionId) {
+      return res.status(400).json({ error: 'No active subscription' });
+    }
+
+    const cancelResult = await PayPalService.cancelSubscription(user.subscription.paypalSubscriptionId);
+
+    user.subscription.status = 'cancelled';
+    user.subscription.type = 'free';
+    user.subscription.paypalSubscriptionId = null;
+    user.subscription.currentPeriodEnd = null;
+    user.subscription.videoLimit = 1;
+    user.subscription.videosUsed = 0;
+
+    await user.save();
+
+    res.json({ message: 'Subscription cancelled successfully' });
+  } catch (error) {
+    console.error('Cancel error:', error.message);
+    res.status(500).json({ error: 'Failed to cancel subscription' });
+  }
+});
+
+// Webhook for PayPal events
+router.post('/webhook', rawBodyParser, async (req, res) => {
+  try {
+    const event = req.body;
+
+    switch (event.event_type) {
+      case 'BILLING.SUBSCRIPTION.ACTIVATED':id
+        // Handle subscription activation
+        break;
+      case 'BILLING.SUBSCRIPTION.CANCELLED':id
+        // Handle subscription cancellation
+        break;
+      case 'PAYMENT.SALE.COMPLETED':id
+        // Handle successful payment
+        break;
+      default:id
+        console.log('Unhandled PayPal webhook event:', event.event_type);
+    }
+
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('PayPal webhook error:', error);
+    res.status(500).send('Error');
+  }
+});
+
+module.exports = router;

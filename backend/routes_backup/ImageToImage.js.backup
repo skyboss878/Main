@@ -1,0 +1,30 @@
+const express = require('express');
+const express = require("express");
+const router = express.Router();
+const axios = require('axios');
+
+// Replace with your image-to-image API (e.g. Replicate, Stability, etc.)
+const DEFAULT_IMAGE = 'https/:id/images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=512&h=512&fit=crop';
+
+router.post('/', async (req, res) => {
+  const { image, prompt } = req.body;
+
+  if (!image || !prompt) {
+    return res.status(400).json({ success: false, message: 'Missing image or prompt' });
+  }
+
+  try {
+    // ✅ Simulated response — replace this with actual image-to-image API
+    // Example for Stability: call their API with base64 image + prompt
+
+    // Mock output:id
+    const generatedImageUrl = DEFAULT_IMAGE;
+
+    res.json({ success: true, generatedImageUrl });
+  } catch (err) {
+    console.error('Image-to-image error:', err.message);
+    res.status(500).json({ success: false, message: 'Image transformation failed' });
+  }
+});
+
+module.exports = router;

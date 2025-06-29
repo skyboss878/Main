@@ -1,0 +1,144 @@
+const express = require('express');
+const express = require("express");
+const router = express.Router();
+
+// AI Commercial Video Generation Route
+router.post('/generate-commercial', async (req, res) => {
+  try {
+    const {
+      businessName,
+      businessType,
+      targetAudience,
+      keyMessage,
+      callToAction,
+      duration,
+      style,
+      mood
+    } = req.body;
+
+    // Validation
+    if (!businessName || !keyMessage || !callToAction) {
+      return res.status(400).json({
+        success: false,
+        message: 'Business name, key message, and call to action are required.'
+      });
+    }
+
+    // Simulate AI video generation processing time
+    await new Promise(resolve => setTimeout(resolve, 2500));
+
+    // Script Generator
+    const generateAIScript = () => {
+      const hooks = {
+        'tech': [
+          "Transform your business with cutting-edge technology",
+          "Ready to revolutionize your digital presence?",
+          "The future of business is here"
+        ],
+        'restaurant': [
+          "Taste the difference that quality makes",
+          "Where every meal becomes a memorable experience",
+          "Satisfy your cravings with authentic flavors"
+        ],
+        'retail': [
+          "Discover products that change your life",
+          "Quality meets affordability at",
+          "Your one-stop destination for"
+        ],
+        'healthcare': [
+          "Your health is our priority",
+          "Compassionate care, cutting-edge treatment",
+          "Trust your wellness to the experts"
+        ],
+        'default': [
+          "Experience excellence like never before",
+          "Quality, service, and value combined",
+          "Your success is our mission"
+        ]
+      };
+
+      const problems = {
+        'tech': "Struggling with outdated systems and inefficient processes?",
+        'restaurant': "Tired of ordinary dining experiences?",
+        'retail': "Looking for quality products at unbeatable prices?",
+        'healthcare': "Concerned about finding the right healthcare provider?",
+        'default': "Ready for a better solution?"
+      };
+
+      const solutions = {
+        'tech': "Our innovative technology solutions streamline your operations and boost productivity.",
+        'restaurant': "We create culinary masterpieces using the finest ingredients and time-honored techniques.",
+        'retail': "We curate premium products and offer them at prices that won't break the bank.",
+        'healthcare': "Our experienced team provides personalized care with the latest medical advances.",
+        'default': "We deliver exceptional results through expertise and dedication."
+      };
+
+      const businessKey = businessType ? businessType.toLowerCase().split(' ')[0] : 'default';
+      const hookOptions = hooks[businessKey] || hooks['default'];
+      const randomHook = hookOptions[Math.floor(Math.random() * hookOptions.length)];
+
+      return {
+        hook: randomHook,
+        problem: problems[businessKey] || problems['default'],
+        solution: solutions[businessKey] || solutions['default'],
+        keyMessage,
+        callToAction,
+        businessName
+      };
+    };
+
+    // Video Scene Generator
+    const generateVideoScenes = (script, duration) => {
+      const totalDuration = parseInt(duration) || 30;
+
+      const baseScenes = [
+        { id: 1, type: 'hook', text: script.hook, animation: 'fadeInUp', duration: 4 },
+        { id: 2, type: 'problem', text: script.problem, animation: 'slideInLeft', duration: 4 },
+        { id: 3, type: 'solution', text: script.solution, animation: 'slideInRight', duration: 5 },
+        { id: 4, type: 'keyMessage', text: script.keyMessage, animation: 'zoomIn', duration: 5 },
+        { id: 5, type: 'callToAction', text: script.callToAction, animation: 'bounce', duration: 4 },
+        { id: 6, type: 'branding', text: `Presented by ${script.businessName}`, animation: 'fadeOut', duration: 4 }
+      ];
+
+      // Adjust durations if total is too short
+      const actualTotal = baseScenes.reduce((sum, s) => sum + s.duration, 0);
+      if (totalDuration < actualTotal) {
+        const scale = totalDuration / actualTotal;
+        return baseScenes.map(scene => ({
+          ...scene,
+          duration: Math.max(2, Math.floor(scene.duration * scale))
+        }));
+      }
+
+      return baseScenes;
+    };
+
+    const script = generateAIScript();
+    const scenes = generateVideoScenes(script, duration);
+
+    const response = {
+      success: true,
+      message: 'AI commercial script and scenes generated',
+      data: {
+        script,
+        scenes,
+        style: style || 'cinematic',
+        mood: mood || 'inspiring',
+        targetAudience: targetAudience || 'general',
+        generatedAt: new Date().toISOString()
+      }
+    };
+
+    res.json(response);
+  } catch (err) {
+    console.error('❌ Error generating commercial:', err.message);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error during commercial generation.',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+});
+
+module.exports = router;
+

@@ -1,0 +1,215 @@
+const express = require('express');
+const express = require("express");
+const router = express.Router();
+const { OpenAI } = require('openai');
+const VideoService = require('../services/VideoService');
+require('dotenv').config();
+
+// Initialize OpenAI
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// POST /api/flyer - Generate text-based flyer
+router.post('/', async (req, res) => {
+  try {
+    console.log('📥 Received flyer request');
+    console.log('Headers:', req.headers);
+    console.log('Body:', req.body);
+    console.log('Body type:', typeof req.body);
+    console.log('Body keys:', Object.keys(req.body || {}));
+
+    // Handle both businessType (legacy) and prompt (new) fields
+    const { businessType, prompt, type = 'text' } = req.body;
+    const input = businessType || prompt;
+
+    if (!input || typeof input !== 'string' || input.trim().length === 0) {
+      console.log('❌ No valid input provided');
+      return res.status(400).json({ 
+        success: false, 
+        message: 'businessType or prompt is required and must be a non-empty string',
+        received: { businessType, prompt, type: typeof input }
+      });
+    }
+
+    console.log('✅ Input validated:', input);
+    console.log('📄 Flyer type:', type);
+
+    // Generate text-based flyer
+    if (type === 'text' || !type) {
+      const flyerPrompt = `Write a catchy, short promotional flyer text for: ${input}. 
+        Include an attention-grabbing headline, key benefits, and a strong call to action. 
+        Make it engaging and professional.`;
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4',
+        messages: [{ role: 'user', content: flyerPrompt }],
+        temperature: 0.8,
+        max_tokens: 300,
+      });
+
+      const flyerText = completion.choices[0].message.content.trim();
+      
+      console.log('✅ Text flyer generated successfully');
+      return res.json({ 
+        success: true, 
+        flyer: flyerText,
+        type: 'text',
+        input: input
+      });
+    }
+
+    // Generate video flyer (social media style)
+    if (type === 'video' || type === 'social') {
+      console.log('🎬 Generating video flyer...');
+      
+      const videoResult = await VideoService.generateSocialMediaVideo(input, {
+        duration: 30,
+        style: 'flyer'
+      });
+
+      console.log('✅ Video flyer generated successfully');
+      return res.json({
+        success: true,
+        type: 'video',
+        input: input,
+        ...videoResult
+      });
+    }
+
+    // Invalid type
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid type. Must be "text" or "video"'
+    });
+
+  } catch (err) {
+    console.error('❌ Flyer generation error:', err);
+    
+    // More specific error handling
+    if (err.code === 'insufficient_quota') {
+      return res.status(402).json({ 
+        success: false, 
+        message: 'OpenAI API quota exceeded. Please try again later.' 
+      });
+    }
+
+    if (err.code === 'rate_limit_exceeded') {
+      return res.status(429).json({ 
+        success: false, 
+        message: 'Rate limit exceeded. Please try again in a few minutes.' 
+      });
+    }
+
+    if (err.response?.status === 401) {
+      return res.status(500).json({ 
+        success: false, 
+        message: 'API authentication failed. Please contact support.' 
+      });
+    }
+
+    res.status(500).json({ 
+      success: false, 
+      message: 'Flyer generation failed',
+      error: err.message 
+    });
+  }
+});
+
+// POST /api/flyer/video - Generate video flyer specifically
+router.post('/video', async (req, res) => {
+  try {
+    console.log('🎬 Video flyer request received');
+    console.log('Body:', req.body);
+
+    const { prompt, businessType, duration = 30, options = {} } = req.body;
+    const input = prompt || businessType;
+
+    if (!input || typeof input !== 'string' || input.trim().length === 0) {
+      console.log('❌ No valid input for video flyer');
+      return res.status(400).json({ 
+        success: false, 
+        message: 'prompt or businessType is required and must be a non-empty string' 
+      });
+    }
+
+    console.log('✅ Generating video flyer for:', input);
+
+    const result = await VideoService.generateSocialMediaVideo(input, {
+      duration,
+      style: 'flyer',
+      ...options
+    });
+
+    console.log('✅ Video flyer completed');
+    res.json({
+      success: true,
+      type: 'video',
+      input: input,
+      ...result
+    });
+
+  } catch (error) {
+    console.error('❌ Video flyer error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Video flyer generation failed',
+      error: error.message
+    });
+  }
+});
+
+// GET /api/flyer/templates - Get flyer templates
+router.get('/templates', (req, res) => {
+  const templates = [
+    {
+      id: 'restaurant',
+      name: 'Restaurant/Food',
+      description: 'Perfect for restaurants, cafes, and food businesses',
+      example: 'Italian restaurant with authentic pasta dishes'
+    },
+    {
+      id: 'retail',
+      name: 'Retail/Shopping',
+      description: 'Great for stores, boutiques, and retail businesses',
+      example: 'Fashion boutique with trendy clothing'
+    },
+    {
+      id: 'service',
+      name: 'Service Business',
+      description: 'Ideal for service-based businesses',
+      example: 'Professional cleaning service'
+    },
+    {
+      id: 'event',
+      name: 'Event/Entertainment',
+      description: 'Perfect for events, concerts, and entertainment',
+      example: 'Summer music festival'
+    },
+    {
+      id: 'health',
+      name: 'Health/Wellness',
+      description: 'Great for gyms, spas, and wellness centers',
+      example: 'Yoga studio with meditation classes'
+    }
+  ];
+
+  res.json({
+    success: true,
+    templates,
+    count: templates.length
+  });
+});
+
+// GET /api/flyer/health - Health check
+router.get('/health', (req, res) => {
+  res.json({
+    success: true,
+    status: 'healthy',
+    services: {
+      openai: !!process.env.OPENAI_API_KEY,
+      videoService: true
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+module.exports = router;

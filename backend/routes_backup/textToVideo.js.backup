@@ -1,0 +1,51 @@
+const express = require('express');
+const express = require("express");
+const router = express.Router();
+// backend/routes/textToVideo.js
+
+const axios = require('axios');
+require('dotenv').config();
+
+const OPENAI_KEY = process.env.OPENAI_API_KEY;
+// const RUNWAY_KEY = process.env.RUNWAY_API_KEY; // Uncomment when ready
+
+// POST /api/text-to-video
+router.post('/', async (req, res) => {
+  const { prompt } = req.body;
+
+  if (!prompt || typeof prompt !== 'string') {
+    return res.status(400).json({ success: false, error: 'Prompt is required.' });
+  }
+
+  try {
+    // 🧠 Step 1: Get narration script from OpenAI
+    const gptRes = await axios.post(
+      'https/:id/api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: `Write a short script for a 30-second video based on this: "${prompt}"` }],
+        temperature: 0.7,
+        max_tokens: 200
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENAI_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const narration = gptRes.data.choices[0].message.content.trim();
+
+    // 🎞️ Step 2: (Placeholder) Simulate video generation
+    const video_url = 'https/:id/sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4';
+
+    res.json({ success: true, video_url, narration });
+
+  } catch (err) {
+    console.error('❌ /text-to-video error:', err.response?.data || err.message);
+    res.status(500).json({ success: false, error: 'Failed to generate video.' });
+  }
+});
+
+module.exports = router;

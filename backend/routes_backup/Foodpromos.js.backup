@@ -1,0 +1,172 @@
+const express = require('express');
+const express = require("express");
+const router = express.Router();
+
+// AI-powered food promo generation
+router.post('/foodpromo', async (req, res) => {
+  try {
+    const { restaurantName, foodType, specialOffer, promoType, duration } = req.body;
+
+    if (!restaurantName || !specialOffer) {
+      return res.status(400).json({ 
+        message: 'Restaurant name and special offer are required.',
+        success: false 
+      });
+    }
+
+    // Simulate AI processing delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // AI-generated marketing copy based on inputs
+    const generateMarketingCopy = () => {
+      const actionWords = ['Discover', 'Experience', 'Taste', 'Enjoy', 'Savor', 'Indulge'];
+      const foodDescriptors = {
+        'pizza': ['wood-fired', 'artisanal', 'authentic Italian', 'crispy'],
+        'burgers': ['juicy', 'gourmet', 'flame-grilled', 'handcrafted'],
+        'asian': ['authentic', 'fresh', 'traditional', 'flavorful'],
+        'mexican': ['spicy', 'traditional', 'fresh', 'zesty'],
+        'italian': ['traditional', 'homemade', 'authentic', 'rustic'],
+        'seafood': ['fresh', 'ocean-fresh', 'premium', 'sustainable'],
+        'desserts': ['decadent', 'homemade', 'irresistible', 'sweet'],
+        'coffee': ['artisan', 'freshly roasted', 'premium', 'aromatic']
+      };
+
+      const randomAction = actionWords[Math.floor(Math.random() * actionWords.length)];
+      const foodKey = foodType ? foodType.toLowerCase().split(' ')[0] : 'other';
+      const descriptors = foodDescriptors[foodKey] || ['delicious', 'amazing', 'perfect'];
+      const randomDescriptor = descriptors[Math.floor(Math.random() * descriptors.length)];
+
+      return {
+        headline: `${randomAction} ${randomDescriptor} ${foodType || 'cuisine'} at ${restaurantName}!`,
+        subheadline: `${specialOffer} - ${duration || 'Limited time only!'}`,
+        callToAction: 'Order Now & Save!'
+      };
+    };
+
+    // Generate color scheme based on food type
+    const generateColorScheme = () => {
+      const colorSchemes = {
+        'pizza': { primary: '#FF6B35', secondary: '#F7931E', accent: '#FFD23F' },
+        'burgers': { primary: '#8B4513', secondary: '#DAA520', accent: '#FF6347' },
+        'asian': { primary: '#DC143C', secondary: '#FFD700', accent: '#000000' },
+        'mexican': { primary: '#FF4500', secondary: '#32CD32', accent: '#FFD700' },
+        'italian': { primary: '#008000', secondary: '#FF0000', accent: '#FFFFFF' },
+        'seafood': { primary: '#4682B4', secondary: '#87CEEB', accent: '#F0F8FF' },
+        'desserts': { primary: '#FF69B4', secondary: '#FFB6C1', accent: '#FFFFFF' },
+        'coffee': { primary: '#8B4513', secondary: '#D2691E', accent: '#F5DEB3' }
+      };
+
+      const foodKey = foodType ? foodType.toLowerCase().split(' ')[0] : 'other';
+      return colorSchemes[foodKey] || { primary: '#FF6B35', secondary: '#F7931E', accent: '#FFD23F' };
+    };
+
+    const marketingCopy = generateMarketingCopy();
+    const colorScheme = generateColorScheme();
+
+    // Enhanced promo object
+    const promo = {
+      success: true,
+      data: {
+        id: `promo_${Date.now()}`,
+        restaurantName,
+        foodType,
+        specialOffer,
+        duration: duration || 'Limited time only!',
+        
+        // AI-generated content
+        marketing: marketingCopy,
+        
+        // Design elements
+        design: {
+          colorScheme,
+          layout: 'modern',
+          style: 'vibrant'
+        },
+        
+        // Flyer elements
+        elements: {
+          title: restaurantName,
+          subtitle: foodType ? `Authentic ${foodType}` : 'Delicious Food',
+          offer: specialOffer,
+          duration: duration || 'Limited Time Only!',
+          callToAction: marketingCopy.callToAction,
+          hashtags: [`#${restaurantName.replace(/\s+/g, '')}`, `#${foodType || 'Food'}`, '#SpecialOffer']
+        },
+        
+        // Social media ready content
+        socialMedia: {
+          caption: `🍽️ ${marketingCopy.headline}\n\n${marketingCopy.subheadline}\n\n${marketingCopy.callToAction}`,
+          hashtags: [`#${restaurantName.replace(/\s+/g, '')}`, `#${foodType || 'Food'}`, '#SpecialOffer', '#Restaurant'],
+        },
+        
+        // Generated at timestamp
+        createdAt: new Date().toISOString(),
+        
+        // Promo analytics
+        analytics: {
+          estimatedReach: Math.floor(Math.random() * 5000) + 1000,
+          engagementScore: Math.floor(Math.random() * 40) + 60
+        }
+      }
+    };
+
+    console.log('✅ Food promo generated successfully for:', restaurantName);
+    res.json(promo);
+
+  } catch (err) {
+    console.error('❌ Error generating food promo:', err.message);
+    res.status(500).json({ 
+      message: 'Server error while generating promo. Please try again.',
+      success: false,
+      error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+    });
+  }
+});
+
+// Get promo by ID (for editing/sharing)
+router.get('/foodpromo/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // In a real app, you'd fetch from database
+    // For now, return a sample response
+    res.json({
+      success: true,
+      message: 'Promo retrieved successfully',
+      data: {
+        id,
+        restaurantName: 'Demo Restaurant',
+        specialOffer: '50% OFF All Items',
+        createdAt: new Date().toISOString()
+      }
+    });
+  } catch (err) {
+    console.error('❌ Error fetching promo:', err.message);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching promo'
+    });
+  }
+});
+
+// Delete promo
+router.delete('/foodpromo/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // In a real app, you'd delete from database
+    res.json({
+      success: true,
+      message: 'Promo deleted successfully'
+    });
+  } catch (err) {
+    console.error('❌ Error deleting promo:', err.message);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting promo'
+    });
+  }
+});
+
+module.exports = router;
+

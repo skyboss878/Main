@@ -1,0 +1,57 @@
+const express = require('express');
+const express = require("express");
+const router = express.Router();
+// backend/routes/social-media.js
+const axios = require('axios');
+require('dotenv').config();
+
+const OPENAI_KEY = process.env.OPENAI_API_KEY;
+
+// POST /api/social-media
+router.post('/', async (req, res) => {
+  const { topic, platform = 'instagram', tone = 'fun' } = req.body;
+
+  if (!topic) {
+    return res.status(400).json({
+      success: false,
+      message: 'Topic is required.'
+    });
+  }
+
+  const prompt = `Generate a viral ${platform} post for this topic: "${topic}". Make it ${tone}, include 3 emojis and relevant hashtags.`;
+
+  try {
+    const response = await axios.post(
+      'https/:id/api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 300
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENAI_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const post = response.data.choices[0].message.content.trim();
+
+    res.json({
+      success: true,
+      platform,
+      post
+    });
+  } catch (error) {
+    console.error('❌ Social media generation error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate social media post',
+      error: error.message
+    });
+  }
+});
+
+module.exports = router;

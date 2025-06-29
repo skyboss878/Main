@@ -1,0 +1,150 @@
+const express = require('express');
+const express = require("express");
+const router = express.Router();
+// backend/routes/caption.js
+const axios = require('axios');
+require('dotenv').config();
+
+const OPENAI_KEY = process.env.OPENAI_API_KEY;
+
+// POST /api/caption - Generate captions
+router.post('/', async (req, res) => {
+  try {
+    const { content, platform = 'instagram', tone = 'engaging' } = req.body;
+
+    if (!content) {
+      return res.status(400).json({
+        success: false,
+        message: 'Content is required'
+      });
+    }
+
+    const prompt = `Generate ${platform} captions for: "${content}". Make them ${tone} and include relevant hashtags.`;
+
+    const response = await axios.post(
+      'https/:id/api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 300
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENAI_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const caption = response.data.choices[0].message.content.trim();
+
+    res.json({
+      success: true,
+      caption,
+      platform,
+      tone
+    });
+
+  } catch (error) {
+    console.error('❌ Caption generation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate caption',
+      error: error.message
+    });
+  }
+});
+
+module.exports = router;
+
+// ============================================
+
+// backend/routes/voice.js
+
+// POST /api/voice - Generate voice (placeholder)
+router.post('/', async (req, res) => {
+  try {
+    const { text, voice = 'alloy', speed = 1.0 } = req.body;
+
+    if (!text) {
+      return res.status(400).json({
+        success: false,
+        message: 'Text is required'
+      });
+    }
+
+    // TODO: Integrate with OpenAI TTS or other voice service
+    res.json({
+      success: true,
+      message: 'Voice generation not implemented yet',
+      audioUrl: null,
+      text,
+      voice,
+      speed
+    });
+
+  } catch (error) {
+    console.error('❌ Voice generation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate voice',
+      error: error.message
+    });
+  }
+});
+
+module.exports = router;
+
+// ============================================
+
+// backend/routes/services.js
+
+// GET /api/services - List available AI services
+router.get('/', (req, res) => {
+  const services = [
+    {
+      id: 'video-generation',
+      name: 'Video Generation',
+      description: 'Create social media and commercial videos',
+      endpoints: ['/api/videos/social', '/api/videos/commercial', '/api/videos/product'],
+      status: 'active'
+    },
+    {
+      id: 'tour-creation',
+      name: '360 Tour Creation',
+      description: 'Create virtual tours from images',
+      endpoints: ['/api/tours/create'],
+      status: 'active'
+    },
+    {
+      id: 'flyer-generation',
+      name: 'Flyer Generation',
+      description: 'Generate marketing flyers',
+      endpoints: ['/api/flyer'],
+      status: 'active'
+    },
+    {
+      id: 'caption-generation',
+      name: 'Caption Generation',
+      description: 'Generate social media captions',
+      endpoints: ['/api/caption'],
+      status: 'active'
+    },
+    {
+      id: 'voice-generation',
+      name: 'Voice Generation',
+      description: 'Text-to-speech conversion',
+      endpoints: ['/api/voice'],
+      status: 'coming-soon'
+    }
+  ];
+
+  res.json({
+    success: true,
+    services,
+    count: services.length
+  });
+});
+
+module.exports = router;

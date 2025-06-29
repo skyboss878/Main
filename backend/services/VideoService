@@ -1,0 +1,11 @@
+const ffmpeg = require('fluent-ffmpeg');
+
+// Set FFmpeg path for Termux
+ffmpeg.setFfmpegPath('/data/data/com.termux/files/usr/bin/ffmpeg');
+ffmpeg.setFfprobePath('/data/data/com.termux/files/usr/bin/ffprobe');
+
+class VideoService {
+  // Your video processing methods here
+}
+
+module.exports = VideoService;

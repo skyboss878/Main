@@ -1,0 +1,402 @@
+const express = require('express');
+const express = require("express");
+const router = express.Router();
+const axios = require('axios');
+const rateLimit = require('express-rate-limit');
+const validator = require('validator');
+require('dotenv').config();
+
+const OPENAI_KEY = process.env.OPENAI_API_KEY;
+const ELEVENLABS_KEY = process.env.ELEVENLABS_API_KEY;
+const STABILITY_KEY = process.env.STABILITY_API_KEY;
+const RUNWAY_API_KEY = process.env.RUNWAY_API_KEY;
+
+// Environment validation
+const requiredEnvs = {
+  OPENAI_API_KEY: OPENAI_KEY,
+  ELEVENLABS_API_KEY: ELEVENLABS_KEY
+};
+
+Object.entries(requiredEnvs).forEach(([key, value]) => {
+  if (!value) {
+    console.error(`❌ CRITICAL: ${key} missing from .env`);
+    process.exit(1);
+  }
+});
+
+// Optional keys warnings
+if (!STABILITY_KEY) console.warn("⚠️ STABILITY_API_KEY missing - image generation limited");
+if (!RUNWAY_API_KEY) console.warn("⚠️ RUNWAY_API_KEY missing - video generation unavailable");
+
+// Rate limiting
+const createRateLimit = (windowMs, max, message) => rateLimit({
+  windowMs,
+  max,
+  message: { success: false, message },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Different limits for different endpoints
+const captionLimit = createRateLimit(15 * 60 * 1000, 30, 'Too many caption requests');
+const imageLimit = createRateLimit(15 * 60 * 1000, 10, 'Too many image requests');
+const voiceLimit = createRateLimit(15 * 60 * 1000, 20, 'Too many voice requests');
+const videoLimit = createRateLimit(60 * 60 * 1000, 5, 'Too many video requests');
+
+// Input validation middleware
+const validateInput = (field, maxLength = 1000) => (req, res, next) => {
+  const value = req.body[field];
+  
+  if (!value || typeof value !== 'string' || value.trim().length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: `${field} is required and must be a non-empty string`
+    });
+  }
+  
+  if (value.length > maxLength) {
+    return res.status(400).json({
+      success: false,
+      message: `${field} must be less than ${maxLength} characters`
+    });
+  }
+  
+  // Sanitize input
+  req.body[field] = validator.escape(value.trim());
+  next();
+};
+
+// Error handler middleware
+const handleApiError = (error, service) => {
+  console.error(`❌ ${service} error:`, {
+    message: error.message,
+    status: error.response?.status,
+    data: error.response?.data,
+    timestamp: new Date().toISOString()
+  });
+  
+  if (error.response?.status === 429) {
+    return { status: 429, message: `${service} rate limit exceeded. Try again later.` };
+  }
+  
+  if (error.response?.status === 401) {
+    return { status: 500, message: `${service} authentication failed. Please contact support.` };
+  }
+  
+  return { status: 500, message: `${service} service temporarily unavailable` };
+};
+
+// 🔥 Viral caption + hashtags
+router.post('/caption', captionLimit, validateInput('input', 500), async (req, res) => {
+  const { input } = req.body;
+  
+  try {
+    const prompt = `Create a viral Instagram caption with emojis and 5 trending hashtags for: "${input}". 
+    Format: Caption with emojis, then hashtags on new lines. Keep it engaging and shareable.`;
+
+    const response = await axios.post(
+      'https/:id/api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-4',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.8,
+        max_tokens: 150,
+        presence_penalty: 0.6
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENAI_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 30000
+      }
+    );
+
+    const caption = response.data.choices[0].message.content.trim();
+    
+    res.json({ 
+      success: true, 
+      data: {
+        caption,
+        input: req.body.input,
+        createdAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    const { status, message } = handleApiError(error, 'OpenAI Caption');
+    res.status(status).json({ success: false, message });
+  }
+});
+
+// 🖼️ DALL·E: Generate image from prompt
+router.post('/image', imageLimit, validateInput('prompt', 1000), async (req, res) => {
+  const { prompt, size = '1024x1024', quality = 'standard' } = req.body;
+  
+  const validSizes = ['256x256', '512x512', '1024x1024', '1792x1024', '1024x1792'];
+  const validQualities = ['standard', 'hd'];
+  
+  if (!validSizes.includes(size)) {
+    return res.status(400).json({
+      success: false,
+      message: `Invalid size. Must be one of: ${validSizes.join(', ')}`
+    });
+  }
+  
+  if (!validQualities.includes(quality)) {
+    return res.status(400).json({
+      success: false,
+      message: `Invalid quality. Must be one of: ${validQualities.join(', ')}`
+    });
+  }
+
+  try {
+    const response = await axios.post(
+      'https/:id/api.openai.com/v1/images/generations',
+      {
+        model: 'dall-e-3',
+        prompt: req.body.prompt,
+        n: 1,
+        size,
+        quality,
+        response_format: 'url'
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENAI_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 60000
+      }
+    );
+
+    res.json({ 
+      success: true, 
+      data: {
+        url: response.data.data[0].url,
+        prompt: req.body.prompt,
+        size,
+        quality,
+        createdAt: new Date().toISOString()
+      }
+    });
+    
+  } catch (error) {
+    const { status, message } = handleApiError(error, 'DALL-E');
+    res.status(status).json({ success: false, message });
+  }
+});
+
+// 🎙️ ElevenLabs: Text to Voiceover
+router.post('/voice', voiceLimit, validateInput('text', 2500), async (req, res) => {
+  const { text, voice_id = 'EXAVITQu4vr4xnSDxMaL', model_id = 'eleven_monolingual_v1' } = req.body;
+  
+  // Validate voice settings
+  const { stability = 0.4, similarity_boost = 0.75, style = 0.0, use_speaker_boost = true } = req.body;
+  
+  if (stability < 0 || stability > 1 || similarity_boost < 0 || similarity_boost > 1) {
+    return res.status(400).json({
+      success: false,
+      message: 'Stability and similarity_boost must be between 0 and 1'
+    });
+  }
+
+  try {
+    const response = await axios.post(
+      `https/:id/api.elevenlabs.io/v1/text-to-speech/${voice_id}`,
+      {
+        text: req.body.text,
+        model_id,
+        voice_settings: {
+          stability,
+          similarity_boost,
+          style,
+          use_speaker_boost
+        }
+      },
+      {
+        headers: {
+          'xi-api-key': ELEVENLABS_KEY,
+          'Content-Type': 'application/json',
+          'Accept': 'audio/mpeg'
+        },
+        responseType: 'arraybuffer',
+        timeout: 60000
+      }
+    );
+
+    res.set({
+      'Content-Type': 'audio/mpeg',
+      'Content-Disposition': 'inline; filename="voice.mp3"',
+      'Content-Length': response.data.length,
+      'Cache-Control': 'public, max-age=3600'
+    });
+    
+    res.send(response.data);
+
+  } catch (error) {
+    const { status, message } = handleApiError(error, 'ElevenLabs');
+    res.status(status).json({ success: false, message });
+  }
+});
+
+// 🎥 Text-to-Video (Runway ML integration)
+router.post('/text-to-video', videoLimit, validateInput('prompt', 500), async (req, res) => {
+  const { prompt, duration = 4, aspect_ratio = '16:9' } = req.body;
+  
+  if (!RUNWAY_API_KEY) {
+    return res.status(503).json({
+      success: false,
+      message: 'Video generation service not configured'
+    });
+  }
+  
+  const validAspectRatios = ['16:9', '9:16', '1:1'];
+  const validDurations = [4, 8];
+  
+  if (!validAspectRatios.includes(aspect_ratio)) {
+    return res.status(400).json({
+      success: false,
+      message: `Invalid aspect ratio. Must be one of: ${validAspectRatios.join(', ')}`
+    });
+  }
+  
+  if (!validDurations.includes(duration)) {
+    return res.status(400).json({
+      success: false,
+      message: `Invalid duration. Must be one of: ${validDurations.join(', ')} seconds`
+    });
+  }
+
+  try {
+    // Start video generation job
+    const response = await axios.post(
+      'https/:id/api.runwayml.com/v1/image_to_video',
+      {
+        prompt: req.body.prompt,
+        duration,
+        ratio: aspect_ratio,
+        watermark: false
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${RUNWAY_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 10000
+      }
+    );
+    
+    const jobId = response.data.id;
+    
+    res.json({
+      success: true,
+      data: {
+        jobId,
+        status: 'processing',
+        prompt: req.body.prompt,
+        duration,
+        aspectRatio: aspect_ratio,
+        estimatedTime: '2-3 minutes',
+        createdAt: new Date().toISOString()
+      },
+      message: 'Video generation started. Use /video-status/:jobId to check progress'
+    });
+    
+  } catch (error) {
+    const { status, message } = handleApiError(error, 'Runway Video');
+    res.status(status).json({ success: false, message });
+  }
+});
+
+// 🎥 Check video generation status
+router.get('/video-status/:jobId', async (req, res) => {
+  const { jobId } = req.params;
+  
+  if (!RUNWAY_API_KEY) {
+    return res.status(503).json({
+      success: false,
+      message: 'Video service not configured'
+    });
+  }
+  
+  try {
+    const response = await axios.get(
+      `https/:id/api.runwayml.com/v1/tasks/${jobId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${RUNWAY_API_KEY}`
+        }
+      }
+    );
+    
+    res.json({
+      success: true,
+      data: response.data
+    });
+    
+  } catch (error) {
+    const { status, message } = handleApiError(error, 'Runway Status');
+    res.status(status).json({ success: false, message });
+  }
+});
+
+// 🧠 Available AI services info
+router.get('/services', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      available: [
+        {
+          name: 'caption',
+          description: 'Generate viral Instagram captions with hashtags',
+          endpoint: 'POST /api/ai-services/caption',
+          rateLimit: '30 requests per 15 minutes'
+        },
+        {
+          name: 'image',
+          description: 'Generate images using DALL-E 3',
+          endpoint: 'POST /api/ai-services/image',
+          rateLimit: '10 requests per 15 minutes'
+        },
+        {
+          name: 'voice',
+          description: 'Convert text to speech using ElevenLabs',
+          endpoint: 'POST /api/ai-services/voice',
+          rateLimit: '20 requests per 15 minutes'
+        },
+        {
+          name: 'video',
+          description: 'Generate videos from text prompts',
+          endpoint: 'POST /api/ai-services/text-to-video',
+          rateLimit: '5 requests per hour',
+          status: RUNWAY_API_KEY ? 'available' : 'unavailable'
+        }
+      ],
+      timestamp: new Date().toISOString()
+    }
+  });
+});
+
+// Health check endpoint
+router.get('/health', (req, res) => {
+  res.json({
+    success: true,
+    status: 'healthy',
+    services: {
+      openai: !!OPENAI_KEY,
+      elevenlabs: !!ELEVENLABS_KEY,
+      runway: !!RUNWAY_API_KEY,
+      stability: !!STABILITY_KEY
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+module.exports = { path: "/api/ai-services", router: router };
+
+module.exports = router;
+
+module.exports = router;
+
+module.exports = router;

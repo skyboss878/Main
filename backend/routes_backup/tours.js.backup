@@ -1,0 +1,66 @@
+const express = require('express');
+const express = require("express");
+const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const TourService = require('../services/tourService'); // Import your service
+
+// --- Multer Config for File Uploads ---
+const uploadDir = path.join(__dirname, '..', 'uploads', 'tours_temp'); // Use a temp dir
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueName = `${Date.now()}-${file.originalname}`;
+    cb(null, uniqueName);
+  }
+});
+const upload = multer({ storage });
+
+// --- Main Tour Creation Route ---
+// This single route will handle upload and creation
+router.post('/create', upload.array('images'), async (req, res) => {
+  // 1. Check for uploaded files
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ success: false, message: 'No images or videos uploaded' });
+  }
+
+  // 2. Get data from the request
+  const { title, description } = req.body;
+  const filePaths = req.files.map(file => file.path); // Get paths to the uploaded files
+
+  try {
+    // 3. Call your TourService to create the tour
+    console.log('Starting 360 tour creation...');
+    const tourResult = await TourService.create360Tour(filePaths, {
+      title,
+      description,
+      propertyType: 'property' // You can customize this
+    });
+
+    console.log('✅ Tour created successfully:', tourResult.tourId);
+
+    // 4. Send the successful result back to the frontend
+    res.json({
+      success: true,
+      message: 'Tour created successfully!',
+      ...tourResult
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to create tour:', error);
+    res.status(500).json({ success: false, message: 'Failed to create tour.' });
+  }
+});
+
+// --- Route for viewing the generated tour ---
+// This allows the /tours/tour_id/viewer.html URL to work
+router.use('/tours', express.static(path.join(__dirname, '..', 'uploads', 'tours')));
+
+module.exports = router;

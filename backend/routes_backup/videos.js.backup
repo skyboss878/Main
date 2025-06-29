@@ -1,0 +1,157 @@
+const express = require('express');
+const express = require("express");
+const router = express.Router();
+// backend/routes/videos.js
+
+const auth = require('../middleware/auth');
+const VideoService = require('../services/SimpleVideoService');
+const VideoGeneration = require('../models/VideoGeneration');
+
+// Protect all routes
+router.use(auth);
+
+// Create a new video document in the DB
+async function createVideoDoc(userId, type, prompt, productImages = [], options = {}) {
+  const video = new VideoGeneration({
+    user: userId,
+    type,
+    prompt,
+    productImages,
+    options,
+    status: 'processing'
+  });
+  await video.save();
+  console.log(' Created video doc:', video._id);
+  return video;
+}
+
+// Update the video doc after processing
+async function updateVideoDoc(videoDoc, result, error = null) {
+  if (error) {
+    videoDoc.status = 'failed';
+    videoDoc.error = error.message;
+  } else {
+    videoDoc.status = 'completed';
+    videoDoc.url = result.videoUrl;
+    videoDoc.script = result.script || '';
+    videoDoc.hashtags = result.hashtags || [];
+    videoDoc.musicSuggestions = result.musicSuggestions || [];
+    videoDoc.metadata = {
+      duration: result.duration || 0,
+      format: 'mp4',
+      resolution: '1920x1080'
+    };
+  }
+  await videoDoc.save();
+  return videoDoc;
+}
+
+// POST /api/videos/product -- Generate Product Showcase
+router.post('/product', async (req, res) => {
+  let videoDoc = null;
+
+  try {
+    const { prompt, productImages = [], options = {} } = req.body;
+
+    if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Prompt is required and must be a non-empty string'
+      });
+    }
+
+    if (prompt.length > 2000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Prompt must be less than 2000 characters'
+      });
+    }
+
+    console.log(' Starting product showcase generation...');
+    console.log('User ID:', req.user.id);
+    console.log('Prompt:', prompt.substring(0, 100) + '...');
+    console.log('Product images:', productImages.length);
+
+    // Create DB record
+    videoDoc = await createVideoDoc(req.user.id, 'product', prompt, productImages, options);
+
+    // Send early response
+    res.json({
+      success: true,
+      message: 'Product showcase generation started',
+      data: {
+        id: videoDoc._id,
+        status: 'processing',
+        estimatedTime: '24 minutes'
+      }
+    });
+
+    // Asynchronously process the video
+    try {
+      const result = await VideoService.generateProductShowcase(prompt, productImages, options);
+      console.log(' Product showcase completed:', result.videoUrl);
+      await updateVideoDoc(videoDoc, result);
+    } catch (err) {
+      console.error(' Generation failed:', err.message);
+      await updateVideoDoc(videoDoc, null, err);
+    }
+
+  } catch (error) {
+    console.error(' Product showcase route error:', error.message);
+
+    if (videoDoc) {
+      await updateVideoDoc(videoDoc, null, error).catch(err =>
+        console.error(' Failed to update video doc:', err.message)
+      );
+    }
+
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to start product showcase generation',
+        error: error.message
+      });
+    }
+  }
+});
+
+// GET /api/videos/:videoId -- Fetch video info by ID
+router.get('/:videoId', async (req, res) => {
+  try {
+    const { videoId } = req.params;
+
+    if (!videoId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid video ID format'
+      });
+    }
+
+    const video = await VideoGeneration.findOne({
+      _id: videoId,
+      user: req.user.id
+    });
+
+    if (!video) {
+      return res.status(404).json({
+        success: false,
+        message: 'Video not found or access denied'
+      });
+    }
+
+    res.json({
+      success: true,
+      video
+    });
+
+  } catch (error) {
+    console.error(' Video lookup error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching video',
+      error: error.message
+    });
+  }
+});
+
+module.exports = router;
