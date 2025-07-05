@@ -1,13 +1,10 @@
 // src/App.jsx
-
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext'; // NEW
-// ... other imports
-
 import { AuthProvider } from './contexts/AuthContext';
+import { Toaster } from 'react-hot-toast';
 
-// --- Import all your page components ---
+// Import your components
+import Header from './components/Header';
 import Landing from './pages/Landing';
 import Signup from './pages/Signup';
 import Login from './pages/Login';
@@ -15,41 +12,32 @@ import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
-
-// --- Import all your Creator Tool pages ---
-import VideoGenerator from './pages/VideoGenerator';
-import SocialMediaCreator from './pages/SocialMediaCreator';
-import TourCreatorPage from './pages/TourCreatorPage';
-import RestaurantPromoCreator from './pages/RestaurantPromoCreator';
-import BlogCreator from './pages/BlogCreator';
-import FlyerGenerator from './pages/FlyerGenerator';
-import TextToImage from './pages/TextToImage';
-import FoodPromos from './pages/FoodPromos';
-import RealEstateTour from './pages/RealEstateTour';
-import CreateCommercial from './pages/CreateCommercial';
-import TextToVideo from './pages/TextToVideo';
-import ImageToImage from './pages/ImageToImage';
 import Upgrade from './pages/Upgrade';
+import MyCreations from './pages/MyCreations';
 
-// --- NEW: Import AI-specific pages that match your backend ---
-import CaptionGenerator from './pages/CaptionGenerator'; // For /api/caption
-import VoiceGenerator from './pages/VoiceGenerator';     // For /api/voice
-import AIServices from './pages/AIServices';             // For /api/services
+// Creator Tool Components
+import VideoGenerator from './components/VideoGenerator';
+import SocialMediaCreator from './components/SocialMediaCreator';
+import TourCreatorPage from './pages/TourCreatorPage';
+import RestaurantPromoCreator from './components/RestaurantPromoCreator';
+import BlogCreator from './components/BlogCreator';
+import FlyerGenerator from './pages/FlyerGenerator';
+import TextToImage from './components/TextToImage';
+import FoodPromos from './components/FoodPromos';
+import RealEstateTour from './components/RealEstateTour';
+import CreateCommercial from './components/CreateCommercial';
+import TextToVideo from './components/TextToVideo';
+import ImageRefinement from './components/ImageRefinement';
+import CaptionGenerator from './components/CaptionGenerator';
+import VoiceGenerator from './components/VoiceGenerator';
+import AIServices from './pages/AIServices';
 
 function App() {
   return (
-    <Router>
-      <AuthProvider> {/* NEW: Wrap with AuthProvider */}
-        <Navbar />
+    <AuthProvider>
+      <Router>
+        <Header />
         <Routes>
-          {/* ... your routes */}
-        </Routes>
-      </AuthProvider> {/* NEW */}
-      <Toaster position="bottom-right" />
-    </Router>
-  );
-}
-
           {/* --- Main App Routes --- */}
           <Route path="/" element={<Landing />} />
           <Route path="/signup" element={<Signup />} />
@@ -59,9 +47,10 @@ function App() {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/upgrade" element={<Upgrade />} />
+          <Route path="/my-creations" element={<MyCreations />} />
+          <Route path="/ai-services" element={<AIServices />} />
 
           {/* --- Creator Tool Routes --- */}
-          {/* These paths MUST match the 'route' values in your Dashboard.jsx */}
           <Route path="/create/video-generator" element={<VideoGenerator />} />
           <Route path="/create/social-media-creator" element={<SocialMediaCreator />} />
           <Route path="/create/tour-creator" element={<TourCreatorPage />} />
@@ -73,24 +62,17 @@ function App() {
           <Route path="/create/real-estate-tour" element={<RealEstateTour />} />
           <Route path="/create/create-commercial" element={<CreateCommercial />} />
           <Route path="/create/text-to-video" element={<TextToVideo />} />
-          <Route path="/create/image-to-image" element={<ImageToImage />} />
-
-          {/* --- NEW: AI Service Routes (matching your backend APIs) --- */}
+          <Route path="/create/image-refinement" element={<ImageRefinement />} />
           <Route path="/create/caption-generator" element={<CaptionGenerator />} />
           <Route path="/create/voice-generator" element={<VoiceGenerator />} />
-          <Route path="/ai-services" element={<AIServices />} />
 
           {/* --- Catch-all for 404 --- */}
           <Route path="*" element={<div>Page not found</div>} />
         </Routes>
+        <Toaster position="bottom-right" />
       </Router>
     </AuthProvider>
   );
 }
 
 export default App;
-
-
-
-
-

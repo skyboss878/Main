@@ -1,0 +1,109 @@
+
+
+import React, { useState } from 'react';
+import axios from 'axios';
+
+const VoiceGenerator = () => {
+  const [text, setText] = useState('');
+  const [audioUrl, setAudioUrl] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleGenerateVoice = async () => {
+    if (!text.trim()) {
+      setError('Please enter some text.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      setAudioUrl('');
+
+      const response = await axios.post('/api/voice', { text });
+
+      if (response.data && response.data.audioUrl) {
+        setAudioUrl(response.data.audioUrl);
+      } else {
+        setError('No audio returned from server.');
+      }
+    } catch (err) {
+      setError('Voice generation failed.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-md p-6">
+        <h1 className="text-2xl font-bold mb-4 text-gray-900">🗣️ AI Voice Generator</h1>
+        <p className="text-sm text-gray-600 mb-4">
+          Generate viral voiceovers for your videos, ads, or reels using AI speech.
+        </p>
+
+        <textarea
+          rows={6}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Paste your script here..."
+          className="w-full p-4 border rounded-md mb-4 focus:ring-2 focus:ring-purple-500"
+        />
+
+        <button
+          onClick={handleGenerateVoice}
+          disabled={loading}
+          className="bg-purple-600 text-white px-6 py-3 rounded-md hover:bg-purple-700 transition"
+        >
+          {loading ? 'Generating...' : 'Generate Voice'}
+        </button>
+
+        {error && <p className="text-red-500 mt-4">{error}</p>}
+
+        {audioUrl && (
+          <div className="mt-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-2">🎧 Preview</h2>
+            <audio controls className="w-full">
+              <source src={audioUrl} type="audio/mpeg" />
+              Your browser does not support the audio element.
+            </audio>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default VoiceGenerator;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

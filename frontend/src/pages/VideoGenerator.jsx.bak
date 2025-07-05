@@ -1,0 +1,50 @@
+import React, { useState } from 'react';
+import API from '../utils/api'; // Corrected import
+
+
+const VideoGenerator = () => {
+  const [prompt, setPrompt] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [videoUrl, setVideoUrl] = useState(null);
+
+  const generateVideo = async () => {
+    setLoading(true);
+    setVideoUrl(null);
+    try {
+    const result = await API.ai.generateVideo(prompt); // Corrected function call
+
+      setVideoUrl(result.videoUrl || result.url);
+    } catch {
+      alert('Video generation failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="p-4 max-w-xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">🎬 Generate AI Video</h1>
+      <textarea
+        className="w-full p-3 border rounded mb-4"
+        placeholder="Enter video idea..."
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        rows={4}
+      />
+      <button
+        className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+        onClick={generateVideo}
+        disabled={loading}
+      >
+        {loading ? 'Generating...' : 'Generate Video'}
+      </button>
+      {videoUrl && (
+        <div className="mt-6">
+          <video controls src={videoUrl} className="w-full rounded" />
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default VideoGenerator;

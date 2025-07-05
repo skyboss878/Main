@@ -1,97 +1,190 @@
 // backend/routes/ai.js
 const express = require('express');
 const router = express.Router();
-const { textQueue, imageQueue, voiceQueue, allJobsQueue } = require('../queue/queue'); // Import queues
-const aiService = require('../services/aiService'); // For direct voice fetching
-const authMiddleware = require('../middleware/authMiddleware'); // NEW
-const { checkCredits } = require('../middleware/checkCredits'); // NEW
+const aiService = require('../services/aiService');
+const { textQueue, imageQueue, voiceQueue, videoQueue } = require('../queue/queue'); // Corrected path
 
-// Test route (no auth or credits needed)
-router.get('/test', (req, res) => {
-  res.json({
-    success: true,
-    message: 'AI service test route is working',
-    timestamp: new Date().toISOString()
-  });
-});
+const authMiddleware = require('../middleware/authMiddleware');
+const { checkCredits } = require('../middleware/checkCredits'); // Ensure this is exporting correctly from checkCredits.js
 
 // Enqueue Text Generation Job
-router.post('/generate-text', authMiddleware, checkCredits(1), async (req, res) => { // Cost: 1 credit
+router.post('/generate-text', authMiddleware, checkCredits(1), async (req, res) => {
   const { prompt, options } = req.body;
   if (!prompt) {
-    return res.status(400).json({ success: false, message: 'Prompt is required for text generation.' });
+    return res.status(400).json({ success: false, message: 'Prompt is required.' });
   }
   try {
-    const job = await textQueue.add('generateGenericText', { prompt, options, userId: req.user.id, cost: req.cost }); // Pass userId and cost
-    await allJobsQueue.add('trackJob', { queue: 'textProcessingQueue', jobId: job.id, userId: req.user.id });
-    res.status(202).json({ success: true, message: 'Text generation started.', jobId: job.id, statusUrl: `/api/jobs/${job.id}/status` });
+    const job = await textQueue.add('generateGenericText', { cost: req.cost, prompt, options, userId: req.user.id, cost: req.cost }); // Pass cost from req.cost set by checkCredits
+    res.json({ success: true, jobId: job.id, message: 'Text generation job enqueued.' });
   } catch (error) {
     console.error('❌ Error enqueuing text generation job:', error);
-    res.status(500).json({ success: false, message: 'Failed to start text generation.', error: error.message });
+    res.status(500).json({ success: false, message: 'Failed to enqueue text generation job.', error: error.message });
   }
 });
 
 // Enqueue Image Generation Job
-router.post('/generate-image', authMiddleware, checkCredits(5), async (req, res) => { // Cost: 5 credits
+router.post('/generate-image', authMiddleware, checkCredits(2), async (req, res) => {
   const { prompt, options } = req.body;
   if (!prompt) {
-    return res.status(400).json({ success: false, message: 'Prompt is required for image generation.' });
+    return res.status(400).json({ success: false, message: 'Prompt is required.' });
   }
   try {
-    const job = await imageQueue.add('generateGenericImage', { prompt, options, userId: req.user.id, cost: req.cost }); // Pass userId and cost
-    await allJobsQueue.add('trackJob', { queue: 'imageProcessingQueue', jobId: job.id, userId: req.user.id });
-    res.status(202).json({ success: true, message: 'Image generation started.', jobId: job.id, statusUrl: `/api/jobs/${job.id}/status` });
+    const job = await imageQueue.add('generateGenericImage', { cost: req.cost, prompt, options, userId: req.user.id, cost: req.cost }); // Pass cost
+    res.json({ success: true, jobId: job.id, message: 'Image generation job enqueued.' });
   } catch (error) {
     console.error('❌ Error enqueuing image generation job:', error);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, message: 'Failed to enqueue image generation job.', error: error.message });
   }
 });
 
 // Enqueue Voice Generation Job
-router.post('/generate-voice', authMiddleware, checkCredits(2), async (req, res) => { // Cost: 2 credits
+router.post('/generate-voice', authMiddleware, checkCredits(1), async (req, res) => {
   const { text, options } = req.body;
   if (!text) {
     return res.status(400).json({ success: false, message: 'Text is required for voice generation.' });
   }
   try {
-    const job = await voiceQueue.add('generateVoice', { text, options, userId: req.user.id, cost: req.cost }); // Pass userId and cost
-    await allJobsQueue.add('trackJob', { queue: 'voiceProcessingQueue', jobId: job.id, userId: req.user.id });
-    res.status(202).json({ success: true, message: 'Voice generation started.', jobId: job.id, statusUrl: `/api/jobs/${job.id}/status` });
+    const job = await voiceQueue.add('generateGenericVoice', { cost: req.cost, text, options, userId: req.user.id, cost: req.cost }); // Pass cost
+    res.json({ success: true, jobId: job.id, message: 'Voice generation job enqueued.' });
   } catch (error) {
     console.error('❌ Error enqueuing voice generation job:', error);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, message: 'Failed to enqueue voice generation job.', error: error.message });
   }
 });
 
-
-// Enqueue Ideas Generation Job
-router.post('/generate-ideas', authMiddleware, checkCredits(3), async (req, res) => { // Cost: 3 credits
-  const { type, keywords, tone } = req.body;
-  if (!type || !keywords) {
-    return res.status(400).json({ success: false, message: 'Idea type and keywords are required.' });
+// Enqueue Video Generation Job
+router.post('/generate-video', authMiddleware, checkCredits(5), async (req, res) => {
+  const { prompt, options } = req.body;
+  if (!prompt) {
+    return res.status(400).json({ success: false, message: 'Prompt is required for video generation.' });
   }
   try {
-    const job = await textQueue.add('generateIdeas', { type, keywords, tone, userId: req.user.id, cost: req.cost }); // Pass userId and cost
-    await allJobsQueue.add('trackJob', { queue: 'textProcessingQueue', jobId: job.id, userId: req.user.id });
-    res.status(202).json({ success: true, message: 'Idea generation started.', jobId: job.id, statusUrl: `/api/jobs/${job.id}/status` });
+    const job = await videoQueue.add('generateVideo', { cost: req.cost, prompt, options, userId: req.user.id, cost: req.cost }); // Pass cost
+    res.json({ success: true, jobId: job.id, message: 'Video generation job enqueued.' });
   } catch (error) {
-    console.error('❌ Error enqueuing idea generation job:', error);
-    res.status(500).json({ success: false, error: err.message });
+    console.error('❌ Error enqueuing video generation job:', error);
+    res.status(500).json({ success: false, message: 'Failed to enqueue video generation job.', error: error.message });
   }
 });
 
-// Get available AI voices (no credits needed, direct call)
-router.get('/voices', async (req, res) => {
+// Get available voices
+router.get('/voices', authMiddleware, async (req, res) => {
   try {
-    console.log('🎤 Backend: Fetching available AI voices...');
     const voices = await aiService.getAvailableVoices();
     res.json({ success: true, data: { voices } });
   } catch (error) {
-    console.error('❌ Error fetching voices directly:', error.message);
-    res.status(500).json({ success: false, message: 'Failed to fetch available voices.', error: error.message });
+    console.error('❌ Error fetching voices:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch voices.', error: error.message });
+  }
+});
+
+// Get job status (for text, image, voice, video)
+router.get('/job-status/:queueType/:jobId', authMiddleware, async (req, res) => {
+  const { queueType, jobId } = req.params;
+  let queue;
+
+  switch (queueType) {
+    case 'text':
+      queue = textQueue;
+      break;
+    case 'image':
+      queue = imageQueue;
+      break;
+    case 'voice':
+      queue = voiceQueue;
+      break;
+    case 'video':
+      queue = videoQueue;
+      break;
+    default:
+      return res.status(400).json({ success: false, message: 'Invalid queue type.' });
+  }
+
+  try {
+    const job = await queue.getJob(jobId);
+
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Job not found.' });
+    }
+
+    const state = await job.getState();
+    const result = job.returnvalue;
+    const failedReason = job.failedReason;
+
+    res.json({
+      success: true,
+      jobId: job.id,
+      state: state,
+      result: result,
+      failedReason: failedReason,
+      progress: job.progress
+    });
+  } catch (error) {
+    console.error(`❌ Error getting ${queueType} job status:`, error);
+    res.status(500).json({ success: false, message: `Failed to get ${queueType} job status.`, error: error.message });
+  }
+});
+
+// Enqueue Image to Image Transformation Job (uses generateImage internally)
+router.post('/image-to-image', authMiddleware, checkCredits(3), async (req, res) => {
+  const { imagePath, prompt, options } = req.body;
+  if (!imagePath || !prompt) {
+    return res.status(400).json({ success: false, message: 'Image path and prompt are required for image transformation.' });
+  }
+  try {
+    // This will now pass options to aiService.generateImage, allowing provider selection
+    const job = await imageQueue.add('imageToImage', { cost: req.cost, imagePath, prompt, options, userId: req.user.id, cost: req.cost }); // Pass cost
+    res.json({ success: true, jobId: job.id, message: 'Image transformation job enqueued.' });
+  } catch (error) {
+    console.error('❌ Error enqueuing image transformation job:', error);
+    res.status(500).json({ success: false, message: 'Failed to enqueue image transformation job.', error: error.message });
+  }
+});
+
+// Enqueue Caption Generation Job
+router.post('/generate-caption', authMiddleware, checkCredits(2), async (req, res) => {
+  const { imagePath, options } = req.body;
+  if (!imagePath) {
+    return res.status(400).json({ success: false, message: 'Image path is required for caption generation.' });
+  }
+  try {
+    const job = await textQueue.add('generateCaption', { cost: req.cost, imagePath, options, userId: req.user.id, cost: req.cost }); // Pass cost
+    res.json({ success: true, jobId: job.id, message: 'Caption generation job enqueued.' });
+  } catch (error) {
+    console.error('❌ Error enqueuing caption generation job:', error);
+    res.status(500).json({ success: false, message: 'Failed to enqueue caption generation job.', error: error.message });
   }
 });
 
 
-module.exports = router;
+// NEW: Puter-specific Vision Description (Direct Call)
+router.post('/generate-vision-description', authMiddleware, checkCredits(2), async (req, res) => {
+  const { prompt, imageUrl, model } = req.body;
+  if (!prompt || !imageUrl) {
+    return res.status(400).json({ success: false, message: 'Prompt and image URL are required for vision description.' });
+  }
+  try {
+    const description = await aiService.generateVisionDescription(prompt, imageUrl, model);
+    res.json({ success: true, data: { description }, message: 'Vision description generated.' });
+  } catch (error) {
+    console.error('❌ Error generating vision description:', error);
+    res.status(500).json({ success: false, message: 'Failed to generate vision description.', error: error.message });
+  }
+});
 
+// NEW: Puter-specific Hashtag Generation (Direct Call)
+router.post('/generate-hashtags', authMiddleware, checkCredits(1), async (req, res) => {
+  const { prompt, count } = req.body;
+  if (!prompt) {
+    return res.status(400).json({ success: false, message: 'Prompt is required for hashtag generation.' });
+  }
+  try {
+    const hashtags = await aiService.generateHashtags(prompt, count);
+    res.json({ success: true, data: { hashtags }, message: 'Hashtags generated.' });
+  } catch (error) {
+    console.error('❌ Error generating hashtags:', error);
+    res.status(500).json({ success: false, message: 'Failed to generate hashtags.', error: error.message });
+  }
+});
+
+module.exports = router;

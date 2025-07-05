@@ -1,37 +1,47 @@
-// backend/routes/caption.js
+// ~/main/backend/routes/caption.js
 const express = require('express');
 const router = express.Router();
 const aiService = require('../services/aiService');
+const { textQueue } = require('../queue/queue');
+const authMiddleware = require('../middleware/authMiddleware');
+const { checkCredits, deductCredits } = require('../middleware/checkCredits'); // ✅ FIXED
 
-router.post('/', async (req, res) => {
-  const { prompt, platform, count = 10, tone = 'engaging' } = req.body; // Added tone, default count
+// Route for Caption generation
+router.post(
+  '/',
+  authMiddleware,
+  checkCredits(2), // Cost: 2 credits
+  async (req, res, next) => {
+    const { imagePath, options } = req.body;
 
-  if (!prompt) {
-    return res.status(400).json({ success: false, message: 'Prompt is required for caption generation.' });
+    if (!imagePath) {
+      return res.status(400).json({ success: false, message: 'Image path is required for caption generation.' });
+    }
+
+    try {
+      const job = await textQueue.add('generateCaption', {
+        imagePath,
+        options,
+        userId: req.user.id,
+        cost: req.cost
+      });
+
+      res.locals.result = { jobId: job.id }; // Save job info for final response
+      next(); // Proceed to deduct credits
+    } catch (error) {
+      console.error('❌ Error enqueuing caption generation job:', error);
+      res.status(500).json({ success: false, message: 'Failed to start caption generation.', error: error.message });
+    }
+  },
+  deductCredits, // ✅ Deduct credits only if job was added
+  (req, res) => {
+    res.status(202).json({
+      success: true,
+      message: 'Caption generation started.',
+      jobId: res.locals.result.jobId,
+      statusUrl: `/api/jobs/text/${res.locals.result.jobId}/status`
+    });
   }
-
-  try {
-    console.log(`📝 Backend: Received request for captions with prompt: "${prompt.substring(0, 50)}..."`);
-
-    // Generate main caption text
-    const captionGenPrompt = `Generate ${count} ${tone} social media captions for this content: "${prompt}". Make them concise, suitable for ${platform || 'general social media'}, and distinct. Provide them as a numbered list.`;
-    const captionsRaw = await aiService.generateText(captionGenPrompt, { maxTokens: 500, temperature: 0.7 });
-
-    // Parse captions from the numbered list format (robust parsing)
-    const captions = captionsRaw
-                        .split('\n')
-                        .filter(line => line.match(/^\s*\d+\./)) // Filter lines that start with a number and a dot
-                        .map(line => line.replace(/^\s*\d+\.\s*/, '').trim()) // Remove numbering
-                        .filter(Boolean); // Remove any empty strings after trimming
-
-    // Generate hashtags
-    const hashtags = await aiService.generateHashtags(prompt, platform, Math.min(count, 20)); // Limit hashtags to 20
-
-    res.json({ success: true, data: { captions, hashtags } });
-  } catch (error) {
-    console.error('❌ Backend Error in caption generation route:', error);
-    res.status(500).json({ success: false, message: 'Failed to generate captions.', error: error.message });
-  }
-});
+);
 
 module.exports = router;

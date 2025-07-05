@@ -1,14 +1,13 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'; // ADDED useRef
+import { useNavigate, NavLink } from 'react-router-dom'; // NavLink for active styling
+import { useAuth } from '../contexts/AuthContext'; // AuthContext for user data
+import { motion } from 'framer-motion'; // For animations
+import toast from 'react-hot-toast'; // ADDED toast for notifications
 
-
-import { useAuth } from '../contexts/AuthContext';
-
-// Constants moved outside component to prevent re-creation
-const RECENT_PROJECTS = [
-  // Start with empty array for new users - projects will be added when users create content
-];
-
+// --- Dashboard Constants & Data Definitions ---
+// These arrays define your tools and categories. In a production app,
+// CREATOR_TOOLS might be fetched from a backend API for dynamic updates,
+// and RECENT_PROJECTS will definitely be user-specific, fetched from the backend.
 const CREATOR_TOOLS = [
   {
     id: 'video-generator',
@@ -19,29 +18,152 @@ const CREATOR_TOOLS = [
     gradient: 'from-purple-500 to-pink-600',
     category: 'Video',
     isNew: false,
-    isPremium: false
+    isPremium: false,
+    keywords: 'text to video, generate video, AI video, short video'
   },
   {
     id: 'social-media-creator',
-    title: 'Social Media Creator',
-    description: 'Generate viral social media posts and content',
+    title: 'Social Media Video',
+    description: 'Generate viral social media posts and videos for TikTok, Instagram & more',
     icon: '📱',
     route: '/create/social-media-creator',
     gradient: 'from-blue-500 to-cyan-600',
+    category: 'Video',
+    isNew: true, // Mark as new to highlight
+    isPremium: false,
+    keywords: 'social video, reels, shorts, TikTok, Instagram, Facebook'
+  },
+  {
+    id: 'create-commercial',
+    title: 'Commercial Video',
+    description: 'Produce professional TV and web commercials with AI',
+    icon: '📺',
+    route: '/create/create-commercial',
+    gradient: 'from-violet-500 to-purple-600',
+    category: 'Video',
+    isNew: false,
+    isPremium: true, // Premium feature
+    keywords: 'commercial, ad, marketing video, brand video'
+  },
+  {
+    id: 'text-to-video',
+    title: 'Text to Video',
+    description: 'Convert text scripts into engaging videos with AI voiceovers and visuals',
+    icon: '🎥',
+    route: '/create/text-to-video',
+    gradient: 'from-cyan-500 to-blue-600',
+    category: 'Video',
+    isNew: true, // Mark as new
+    isPremium: false,
+    keywords: 'script to video, AI video, content automation'
+  },
+  {
+    id: 'image-refinement',
+    title: 'Image Refinement',
+    description: 'Transform and enhance images with advanced AI controls & styles',
+    icon: '✨',
+    route: '/create/image-refinement',
+    gradient: 'from-lime-500 to-green-600',
+    category: 'Image',
+    isNew: true, // Marked as new
+    isPremium: true, // Premium feature
+    keywords: 'image editor, AI photo, enhance, style transfer'
+  },
+  {
+    id: 'text-to-image',
+    title: 'Text to Image',
+    description: 'Generate stunning images from text descriptions with AI',
+    icon: '🖼️',
+    route: '/create/text-to-image',
+    gradient: 'from-pink-500 to-rose-600',
+    category: 'Image',
+    isNew: false,
+    isPremium: false, // Set to false if basic text-to-image is not premium
+    keywords: 'AI art, image generator, DALL-E, Midjourney style'
+  },
+  {
+    id: 'voice-generator',
+    title: 'Voice Generator',
+    description: 'Convert text to natural-sounding AI speech with various voices',
+    icon: '🎤',
+    route: '/create/voice-generator',
+    gradient: 'from-gray-500 to-gray-700',
+    category: 'Audio',
+    isNew: false,
+    isPremium: false,
+    keywords: 'text to speech, TTS, AI voice, voiceover'
+  },
+  {
+    id: 'blog-creator',
+    title: 'Blog Post Creator',
+    description: 'Write engaging, SEO-friendly blog posts with AI assistance',
+    icon: '✍️',
+    route: '/create/blog-creator',
+    gradient: 'from-indigo-500 to-purple-600',
+    category: 'Content',
+    isNew: false,
+    isPremium: false,
+    keywords: 'blog writing, AI writer, content generation, SEO'
+  },
+  {
+    id: 'flyer-generator',
+    title: 'Flyer Generator',
+    description: 'Design professional flyers and posters instantly with AI',
+    icon: '📄',
+    route: '/create/flyer-generator',
+    gradient: 'from-teal-500 to-blue-600',
+    category: 'Design',
+    isNew: false,
+    isPremium: false,
+    keywords: 'flyer design, poster maker, AI design'
+  },
+  {
+    id: 'food-promos',
+    title: 'Food Promo Creator',
+    description: 'Create mouth-watering food advertisements and menus',
+    icon: '🍕',
+    route: '/create/food-promos',
+    gradient: 'from-yellow-500 to-orange-600',
+    category: 'Food',
+    isNew: false,
+    isPremium: false,
+    keywords: 'food marketing, restaurant ads, menu design'
+  },
+  {
+    id: 'caption-generator',
+    title: 'Caption Generator',
+    description: 'Generate engaging social media captions and hashtags with AI',
+    icon: '💬',
+    route: '/create/caption-generator',
+    gradient: 'from-purple-400 to-pink-400',
     category: 'Social',
-    isNew: true,
-    isPremium: false
+    isNew: false,
+    isPremium: false,
+    keywords: 'social captions, hashtags, content ideas'
   },
   {
     id: 'tour-creator',
     title: '360° Tour Creator',
-    description: 'Create immersive virtual tours for businesses',
+    description: 'Create immersive virtual tours for businesses (Premium Feature)',
     icon: '🏠',
     route: '/create/tour-creator',
     gradient: 'from-green-500 to-emerald-600',
     category: 'Tour',
     isNew: false,
-    isPremium: true
+    isPremium: true, // Premium feature
+    keywords: 'virtual tour, immersive experience, 360 video'
+  },
+  {
+    id: 'real-estate-tour',
+    title: 'Real Estate Tour',
+    description: 'Showcase properties with AI-generated virtual tours and listings (Premium Feature)',
+    icon: '🏡',
+    route: '/create/real-estate-tour',
+    gradient: 'from-emerald-500 to-teal-600',
+    category: 'Real Estate',
+    isNew: false,
+    isPremium: true, // Premium feature
+    keywords: 'property tour, real estate marketing, virtual listing'
   },
   {
     id: 'restaurant-promo-creator',
@@ -52,99 +174,54 @@ const CREATOR_TOOLS = [
     gradient: 'from-orange-500 to-red-600',
     category: 'Food',
     isNew: false,
-    isPremium: false
+    isPremium: false,
+    keywords: 'restaurant marketing, food ads, menu maker'
   },
+
+
   {
-    id: 'blog-creator',
-    title: 'Blog Creator',
-    description: 'Write engaging blog posts with AI assistance',
-    icon: '✍️',
-    route: '/create/blog-creator',
-    gradient: 'from-indigo-500 to-purple-600',
-    category: 'Content',
-    isNew: false,
-    isPremium: false
-  },
-  {
-    id: 'flyer-generator',
-    title: 'Flyer Generator',
-    description: 'Design professional flyers and posters instantly',
-    icon: '📄',
-    route: '/create/flyer-generator',
-    gradient: 'from-teal-500 to-blue-600',
-    category: 'Design',
-    isNew: false,
-    isPremium: false
-  },
-  {
-    id: 'text-to-image',
-    title: 'Text to Image',
-    description: 'Generate stunning images from text descriptions',
-    icon: '🖼️',
-    route: '/create/text-to-image',
-    gradient: 'from-pink-500 to-rose-600',
-    category: 'AI',
-    isNew: false,
-    isPremium: true
-  },
-  {
-    id: 'food-promos',
-    title: 'Food Promos',
-    description: 'Create delicious food advertisements and menus',
-    icon: '🍕',
-    route: '/create/food-promos',
-    gradient: 'from-yellow-500 to-orange-600',
-    category: 'Food',
-    isNew: false,
-    isPremium: false
-  },
-  {
-    id: 'real-estate-tour',
-    title: 'Real Estate Tour',
-    description: 'Showcase properties with virtual tours and listings',
-    icon: '🏡',
-    route: '/create/real-estate-tour',
-    gradient: 'from-emerald-500 to-teal-600',
-    category: 'Real Estate',
-    isNew: false,
-    isPremium: true
-  },
-  {
-    id: 'create-commercial',
-    title: 'Create Commercial',
-    description: 'Produce professional TV and web commercials',
-    icon: '📺',
-    route: '/create/create-commercial',
-    gradient: 'from-violet-500 to-purple-600',
-    category: 'Video',
-    isNew: false,
-    isPremium: true
-  },
-  {
-    id: 'text-to-video',
-    title: 'Text to Video',
-    description: 'Convert text scripts into engaging videos',
-    icon: '🎥',
-    route: '/create/text-to-video',
-    gradient: 'from-cyan-500 to-blue-600',
-    category: 'Video',
-    isNew: true,
-    isPremium: false
-  },
-  {
-    id: 'image-to-image',
-    title: 'Image to Image',
-    description: 'Transform and enhance images with AI',
-    icon: '🔄',
-    route: '/create/image-to-image',
-    gradient: 'from-lime-500 to-green-600',
-    category: 'AI',
-    isNew: false,
-    isPremium: false
+      id: 'ai-services-overview',
+      title: 'All AI Services',
+      description: 'Explore the complete suite of AI tools available',
+      icon: '✨',
+      route: '/ai-services', // Route to the AIServices.jsx overview page
+      gradient: 'from-gray-500 to-gray-600',
+      category: 'All', // Category 'All' to show up universally
+      isNew: false,
+      isPremium: false,
+      keywords: 'all tools, overview, services'
   }
 ];
 
-const CATEGORIES = ['All', 'Video', 'Social', 'Food', 'Design', 'AI', 'Tour', 'Content', 'Real Estate'];
+// Consolidated CATEGORIES for filtering
+const CATEGORIES = [
+    'All', 'Video', 'Image', 'Social', 'Content', 'Design', 'Food', 'Audio', 'Tour', 'Real Estate'
+];
+
+// Placeholder for Recent Projects (will be fetched from backend)
+const RECENT_PROJECTS = [
+    // Example structure for a recent project (for display purposes if array is not empty)
+    // {
+    //     id: 'proj1',
+    //     title: 'Summer Sale Video',
+    //     type: 'Social Media Video',
+    //     duration: '0:30',
+    //     createdAt: 'June 25, 2025',
+    //     thumbnail: 'https://via.placeholder.com/150x100?text=Video+Thumb', // Placeholder
+    //     performance: 'viral',
+    //     views: 125000
+    // },
+    // {
+    //     id: 'proj2',
+    //     title: 'New Product Flyer',
+    //     type: 'Flyer',
+    //     duration: 'N/A',
+    //     createdAt: 'June 24, 2025',
+    //     thumbnail: 'https://via.placeholder.com/150x100?text=Flyer+Thumb', // Placeholder
+    //     performance: 'excellent',
+    //     views: 500
+    // }
+];
 
 const PERFORMANCE_COLORS = {
   excellent: 'bg-green-100 text-green-800 border-green-200',
@@ -153,7 +230,8 @@ const PERFORMANCE_COLORS = {
   average: 'bg-yellow-100 text-yellow-800 border-yellow-200'
 };
 
-// Custom hooks for production
+// --- Custom Hooks ---
+// Animates numerical stats on component mount/update
 const useAnimatedStats = (userStats) => {
   const [animatedStats, setAnimatedStats] = useState({
     videos: 0,
@@ -162,60 +240,60 @@ const useAnimatedStats = (userStats) => {
     revenue: 0,
     subscribers: 0
   });
-
   useEffect(() => {
-    const duration = 1500;
-    const steps = 30;
-    const increment = duration / steps;
+    const duration = 1500; // Animation duration in ms
+    const steps = 30; // Number of animation steps
+    const increment = duration / steps; // Time per step
     let step = 0;
-
     const timer = setInterval(() => {
       step++;
-      const progress = Math.min(step / steps, 1);
-
+      const progress = Math.min(step / steps, 1); // Progress from 0 to 1
       setAnimatedStats({
         videos: Math.floor(userStats.videosCreated * progress),
         views: Math.floor(userStats.totalViews * progress),
-        hours: Math.floor(userStats.hoursGenerated * progress * 10) / 10,
+        hours: Math.floor(userStats.hoursGenerated * progress * 10) / 10, // Round to 1 decimal
         revenue: Math.floor(userStats.revenue * progress),
         subscribers: Math.floor(userStats.subscribers * progress)
       });
-
       if (step >= steps) {
-        clearInterval(timer);
+        clearInterval(timer); // Stop when animation is complete
       }
     }, increment);
 
-    return () => clearInterval(timer);
-  }, [userStats]);
+    return () => clearInterval(timer); // Cleanup on unmount
+  }, [userStats]); // Re-run animation if userStats change
 
   return animatedStats;
 };
 
-// Loading component
+// --- Helper Components ---
+// Displays a simple loading spinner
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center p-4">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
   </div>
 );
 
-// Error boundary component
+// Error Boundary: Catches JavaScript errors in its children and displays a fallback UI.
+// Prevents the entire app from crashing.
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false, error: null };
   }
-
   static getDerivedStateFromError(error) {
+    // Update state so the next render shows the fallback UI.
     return { hasError: true, error };
   }
 
   componentDidCatch(error, errorInfo) {
+    // You can also log the error to an error reporting service here (e.g., Sentry, Bugsnag)
     console.error('Dashboard Error:', error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
+      // You can render any custom fallback UI
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="text-center">
@@ -231,66 +309,80 @@ class ErrorBoundary extends React.Component {
         </div>
       );
     }
-
     return this.props.children;
   }
 }
 
-// Main Dashboard Component
+// --- Main Dashboard Component ---
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  // user object from AuthContext, includes username, email, credits, isPremium
+  const { user, logout } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // For tool click loading state
 
-  // Production-ready user stats starting from zero
+  // Placeholder user stats. In production, these should be fetched from your backend
+  // for the logged-in user. Update this when you implement backend stats tracking.
   const userStats = {
-    videosCreated: 0,
-    totalViews: 0,
-    hoursGenerated: 0.0,
-    revenue: 0,
-    subscribers: 0
+    videosCreated: 0, // Example: user?.stats?.videosCreated || 0
+    totalViews: 0,    // Example: user?.stats?.totalViews || 0
+    hoursGenerated: 0.0, // Example: user?.stats?.hoursGenerated || 0.0
+    revenue: 0,       // Example: user?.stats?.revenue || 0
+    subscribers: 0    // Example: user?.stats?.subscribers || 0
   };
-
   const animatedStats = useAnimatedStats(userStats);
 
-  // Handle tool navigation with loading state
+  // --- Handlers ---
+  // Handles clicking on a creator tool card
   const handleToolClick = useCallback((tool) => {
-    if (tool.isPremium && !user?.isPremium) {
-      navigate('/upgrade');
+    // Essential: Check if user is logged in
+    if (!user) {
+      toast.error("Please log in to use AI tools!", { duration: 3000 });
+      navigate('/login'); // Redirect to login page
       return;
     }
 
-    setIsLoading(true);
-    
-    // Add a small delay to show loading state
+    // Check for premium access if the tool is marked as premium
+    // `user.isPremium` would be a boolean on your user object (e.g., loaded by AuthContext from backend)
+    if (tool.isPremium && !user.isPremium) {
+      toast.error("This is a premium feature. Please upgrade your plan to access!", { duration: 5000 });
+      navigate('/upgrade'); // Redirect to upgrade page
+      return;
+    }
+    setIsLoading(true); // Show loading spinner for tool click
+
+    // Add a small delay to simulate navigation transition (improves UX)
     setTimeout(() => {
       navigate(tool.route);
       setIsLoading(false);
     }, 300);
-  }, [navigate, user]);
+  }, [navigate, user]); // Dependencies: navigate, and user (for premium status check)
 
-  // Filter tools based on category and search
+  // Filters creator tools based on selected category and search term
   const filteredTools = useMemo(() => {
     return CREATOR_TOOLS.filter(tool => {
       const matchesCategory = selectedCategory === 'All' || tool.category === selectedCategory;
       const matchesSearch = tool.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          tool.description.toLowerCase().includes(searchTerm.toLowerCase());
+                            tool.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            (tool.keywords && tool.keywords.toLowerCase().includes(searchTerm.toLowerCase())); // Search by keywords too!
       return matchesCategory && matchesSearch;
     });
-  }, [selectedCategory, searchTerm]);
+  }, [selectedCategory, searchTerm]); // Dependencies: selectedCategory, searchTerm
 
-  // Handle logout
-  const handleLogout = () => {
-    // Add logout functionality here
-    navigate('/login');
+  // Handles user logout (uses logout function from AuthContext)
+  const handleLogoutClick = () => {
+      if (window.confirm("Are you sure you want to log out?")) { // Confirmation dialog
+          logout(); // Call logout from AuthContext
+          navigate('/login'); // Redirect to login page after logout
+      }
   };
 
+ // --- Render Dashboard UI ---
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100">
-        {/* Header */}
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 font-sans">
+        {/* Dashboard Specific Header: Displays basic info & navigation */}
         <div className="bg-white shadow-sm border-b">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
@@ -298,70 +390,110 @@ const Dashboard = () => {
                 <h1 className="text-2xl font-bold text-gray-900">Creator Dashboard</h1>
               </div>
               <div className="flex items-center space-x-4">
-                <button
-                  onClick={() => navigate('/settings')}
-                  className="text-gray-500 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                <NavLink
+                  to="/settings"
+                  className={({ isActive }) =>
+                    `text-gray-500 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100 transition-colors ${isActive ? 'bg-gray-100 text-gray-700' : ''}`
+                  }
                   title="Settings"
                 >
-                  ⚙️
-                </button>
+                  ⚙️ Settings
+                </NavLink>
                 <button
-                  onClick={handleLogout}
+                  onClick={handleLogoutClick}
                   className="text-gray-500 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100 transition-colors text-sm"
                   title="Logout"
                 >
                   Logout
                 </button>
-                <div className="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded-lg">
-                  Welcome, {user?.name || user?.email?.split('@')[0] || 'Creator'}!
-                </div>
+                {/* Welcome message with username/email and credits are handled in the main Header.jsx */}
+                {user && ( // Only show welcome if user object exists (AuthContext provides user)
+                  <div className="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded-lg">
+                    Welcome, <span className="font-semibold text-gray-800">{user.username || user.email?.split('@')[0] || 'Creator'}</span>!
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
 
+//Inside src/pages/Dashboard.jsx
+              <div className="flex items-center space-x-4">
+                <NavLink
+                  to="/settings"
+                  className={({ isActive }) =>
+                    `text-gray-500 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100 transition-colors ${isActive ? 'bg-gray-100 text-gray-700' : ''}`
+                  }
+                  title="Settings"
+                >
+                  ⚙️ Settings
+                </NavLink>
+                {/* NEW LINK BELOW */}
+                <NavLink
+                  to="/my-creations"
+                  className={({ isActive }) =>
+                    `text-gray-500 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100 transition-colors ${isActive ? 'bg-gray-100 text-gray-700' : ''}`
+                  }
+                  title="My Creations"
+                >
+                  📁 My Creations
+                </NavLink>
+                <button
+                  onClick={handleLogoutClick}
+                  className="text-gray-500 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100 transition-colors text-sm"
+                  title="Logout"
+                >
+                  Logout
+                </button>
+                {/* ... rest of the header ... */}
+              </div>
+
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Welcome Message for New Users */}
-          <div className="bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl p-6 mb-8 text-white">
-            <h2 className="text-2xl font-bold mb-2">🎉 Welcome to Your Creator Studio!</h2>
+          {/* Welcome Message for New Users: Guides new users to start creating */}
+          <motion.div
+            className="bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl p-6 mb-8 text-white"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <h2 className="text-2xl font-bold mb-2"> 🎉 Welcome to Your Creator Studio!</h2>
             <p className="text-purple-100 mb-4">
               Start creating amazing content with our AI-powered tools. Choose from videos, flyers, social media posts, and more!
             </p>
             <button
-              onClick={() => setSelectedCategory('Video')}
+              onClick={() => handleToolClick(CREATOR_TOOLS.find(t => t.id === 'social-media-creator'))} // Directs to a popular starting tool
               className="bg-white text-purple-600 px-4 py-2 rounded-lg font-medium hover:bg-purple-50 transition-colors"
             >
-              Start Creating →
+              Create Your First Video
             </button>
-          </div>
+          </motion.div>
 
-          {/* Stats Cards */}
+          {/* Stats Cards: Animates and displays key performance indicators */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-            <div className="bg-white rounded-xl p-6 shadow-sm border">
+            <motion.div className="bg-white rounded-xl p-6 shadow-sm border" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
               <div className="flex items-center">
                 <div className="p-2 bg-purple-100 rounded-lg">
-                  <span className="text-2xl">🎬</span>
+                  <span className="text-2xl"> 🎬</span>
                 </div>
                 <div className="ml-4">
                   <p className="text-sm text-gray-600">Videos Created</p>
                   <p className="text-2xl font-bold text-gray-900">{animatedStats.videos}</p>
                 </div>
               </div>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 shadow-sm border">
+            </motion.div>
+            <motion.div className="bg-white rounded-xl p-6 shadow-sm border" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
               <div className="flex items-center">
                 <div className="p-2 bg-blue-100 rounded-lg">
-                  <span className="text-2xl">👀</span>
+                  <span className="text-2xl"> 👀</span>
                 </div>
                 <div className="ml-4">
                   <p className="text-sm text-gray-600">Total Views</p>
                   <p className="text-2xl font-bold text-gray-900">{animatedStats.views.toLocaleString()}</p>
                 </div>
               </div>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 shadow-sm border">
+            </motion.div>
+            <motion.div className="bg-white rounded-xl p-6 shadow-sm border" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }}>
               <div className="flex items-center">
                 <div className="p-2 bg-green-100 rounded-lg">
                   <span className="text-2xl">⏱️</span>
@@ -371,34 +503,34 @@ const Dashboard = () => {
                   <p className="text-2xl font-bold text-gray-900">{animatedStats.hours}h</p>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-white rounded-xl p-6 shadow-sm border">
+            <motion.div className="bg-white rounded-xl p-6 shadow-sm border" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.3 }}>
               <div className="flex items-center">
                 <div className="p-2 bg-yellow-100 rounded-lg">
-                  <span className="text-2xl">💰</span>
+                  <span className="text-2xl"> 💰</span>
                 </div>
                 <div className="ml-4">
                   <p className="text-sm text-gray-600">Earnings</p>
                   <p className="text-2xl font-bold text-gray-900">${animatedStats.revenue.toLocaleString()}</p>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-white rounded-xl p-6 shadow-sm border">
+            <motion.div className="bg-white rounded-xl p-6 shadow-sm border" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.4 }}>
               <div className="flex items-center">
                 <div className="p-2 bg-pink-100 rounded-lg">
-                  <span className="text-2xl">👥</span>
+                  <span className="text-2xl"> 👥</span>
                 </div>
                 <div className="ml-4">
                   <p className="text-sm text-gray-600">Followers</p>
                   <p className="text-2xl font-bold text-gray-900">{animatedStats.subscribers.toLocaleString()}</p>
                 </div>
               </div>
-            </div>
+            </motion.div>
           </div>
 
-          {/* Search and Filter */}
+          {/* Search and Filter: Helps users find specific tools quickly */}
           <div className="mb-8">
             <div className="flex flex-col sm:flex-row gap-4 mb-6">
               <div className="flex-1">
@@ -407,12 +539,11 @@ const Dashboard = () => {
                   placeholder="Search creator tools... (videos, flyers, social media, etc.)"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900" // Added text-gray-900 for visibility
                 />
               </div>
             </div>
-
-            {/* Category Filter */}
+            {/* Category Filter: Allows quick Browse by tool type */}
             <div className="flex flex-wrap gap-2">
               {CATEGORIES.map(category => (
                 <button
@@ -430,42 +561,47 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Creator Tools Grid */}
+          {/* Creator Tools Grid: Displays all available AI tools */}
           <div className="mb-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">🚀 Creator Tools</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-6"> 🚀 Creator Tools</h2>
             {isLoading && <LoadingSpinner />}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredTools.map(tool => (
-                <div
+                <motion.div
                   key={tool.id}
                   onClick={() => handleToolClick(tool)}
-                  className="bg-white rounded-xl p-6 shadow-sm border hover:shadow-lg transition-all duration-200 cursor-pointer hover:-translate-y-1 group relative"
+                  className="bg-white rounded-xl p-6 shadow-sm border hover:shadow-lg transition-all duration-200 cursor-pointer hover:-translate-y-1 group relative flex flex-col justify-between" // Added flex-col & justify-between
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  viewport={{ once: true }}
                 >
-                  <div className={`w-12 h-12 rounded-lg bg-gradient-to-r ${tool.gradient} flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform duration-200`}>
-                    {tool.icon}
-                  </div>
-
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-bold text-gray-900 group-hover:text-purple-600 transition-colors">
-                      {tool.title}
-                    </h3>
-                    <div className="flex space-x-1">
-                      {tool.isNew && (
-                        <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-                          New
-                        </span>
-                      )}
-                      {tool.isPremium && (
-                        <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">
-                          Pro
-                        </span>
-                      )}
+                  <div> {/* Wrapper for icon, title, description */}
+                    <div className={`w-12 h-12 rounded-lg bg-gradient-to-r ${tool.gradient} flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform duration-200`}>
+                      {tool.icon}
                     </div>
-                  </div>
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="font-bold text-gray-900 group-hover:text-purple-600 transition-colors">
+                        {tool.title}
+                      </h3>
+                      <div className="flex space-x-1">
+                        {tool.isNew && (
+                          <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                            New
+                          </span>
+                        )}
+                        {/* Display Pro tag for Premium tools */}
+                        {tool.isPremium && (
+                          <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">
+                            Pro
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-gray-600 text-sm mb-4">{tool.description}</p>
+                  </div> {/* End wrapper for icon, title, description */}
 
-                  <p className="text-gray-600 text-sm mb-4">{tool.description}</p>
-
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-100"> {/* mt-auto pushes to bottom */}
                     <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
                       {tool.category}
                     </span>
@@ -473,15 +609,14 @@ const Dashboard = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
-            
             {filteredTools.length === 0 && (
-              <div className="text-center py-12 text-gray-500">
+                <div className="text-center py-12 text-gray-500">
                 <span className="text-4xl mb-4 block">🔍</span>
                 <p>No tools found matching your search.</p>
-                <button 
+                <button
                   onClick={() => setSearchTerm('')}
                   className="text-purple-600 hover:text-purple-700 mt-2"
                 >
@@ -491,10 +626,15 @@ const Dashboard = () => {
             )}
           </div>
 
-          {/* Getting Started Section for New Users */}
-          {RECENT_PROJECTS.length === 0 && (
+          {/* Getting Started Section for New Users: Visible if no recent projects */}
+          {RECENT_PROJECTS.length === 0 && ( // Only show this if RECENT_PROJECTS is empty
             <div className="mb-8">
-              <div className="bg-white rounded-xl p-8 shadow-sm border text-center">
+              <motion.div
+                className="bg-white rounded-xl p-8 shadow-sm border text-center"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+              >
                 <span className="text-6xl mb-4 block">🎨</span>
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">Ready to Create Something Amazing?</h2>
                 <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
@@ -502,7 +642,7 @@ const Dashboard = () => {
                 </p>
                 <div className="flex justify-center space-x-4">
                   <button
-                    onClick={() => handleToolClick(CREATOR_TOOLS.find(t => t.id === 'video-generator'))}
+                    onClick={() => handleToolClick(CREATOR_TOOLS.find(t => t.id === 'social-media-creator'))} // Directs to a popular starting tool
                     className="bg-purple-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-purple-700 transition-colors"
                   >
                     Create Your First Video
@@ -514,12 +654,12 @@ const Dashboard = () => {
                     Design a Flyer
                   </button>
                 </div>
-              </div>
+              </motion.div>
             </div>
           )}
 
-          {/* Recent Projects */}
-          {RECENT_PROJECTS.length > 0 && (
+          {/* Recent Projects: Displays recently created content (dynamic data needed) */}
+          {RECENT_PROJECTS.length > 0 && ( // Only show this if RECENT_PROJECTS has content
             <div className="mb-8">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-900">📁 Recent Projects</h2>
@@ -527,17 +667,24 @@ const Dashboard = () => {
                   View all
                 </button>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {RECENT_PROJECTS.map(project => (
-                  <div key={project.id} className="bg-white rounded-xl p-6 shadow-sm border hover:shadow-lg transition-shadow">
+                  <motion.div
+                    key={project.id}
+                    className="bg-white rounded-xl p-6 shadow-sm border hover:shadow-lg transition-shadow"
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    viewport={{ once: true }}
+                  >
                     <div className="flex items-start space-x-4">
                       <img
                         src={project.thumbnail}
                         alt={project.title}
                         className="w-20 h-16 rounded-lg object-cover"
                         onError={(e) => {
-                          e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xMjUgNzVIMTc1VjEyNUgxMjVWNzVaIiBmaWxsPSIjRDFENURCIi8+Cjx0ZXh0IHg9IjE1MCIgeT0iMTUwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTlBM0FFIiBmb250LWZhbWlseT0ic3lzdGVtLXVpIiBmb250LXNpemU9IjEyIj5JbWFnZSBub3QgZm91bmQ8L3RleHQ+Cjwvc3ZnPg==';
+                          // Fallback image if thumbnail fails to load
+                          e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xMjUgNzVIMTczVjEyNUgxMjVWNzVaIiBmaWxsPSIjRDFENURCIi8+Cjx0ZXh0IHg9IjE1MCIgeT0iMTUwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTlBM0FFIiBmb250LWZhbWlseT0ic3lzdGVtLXVpIiBmb250LXNpemU9IjEyIj5JbWFnZSBub3QgZm91bmQ8L3RleHQ+Cjwvc3ZnPg==';
                         }}
                       />
 
@@ -560,7 +707,7 @@ const Dashboard = () => {
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             </div>
@@ -572,6 +719,9 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
+
+
 
 
 

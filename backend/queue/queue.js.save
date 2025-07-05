@@ -1,0 +1,57 @@
+// backend/queue/queue.js
+const { Queue } = require('bullmq');
+require('dotenv').config({ path: '../.env' }); // Load .env from backend root
+
+const REDIS_HOST = process.env.REDIS_HOST || '127.0.0.1';
+const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6379', 10);
+const REDIS_PASSWORD = process.env.REDIS_PASSWORD || null;
+
+const connection = {
+  host: REDIS_HOST,
+  port: REDIS_PORT,
+  password: REDIS_PASSWORD,
+};
+
+// Define different queues for different types of jobs
+const videoQueue = new Queue('videoProcessingQueue', { connection });
+const imageQueue = new Queue('imageProcessingQueue', { connection });
+const voiceQueue = new Queue('voiceProcessingQueue', { connection });
+const textQueue = new Queue('textProcessingQueue', { connection }); // For blog, captions, descriptions, etc.
+
+// A single queue to track all jobs if you want to poll generic status
+const allJobsQueue = new Queue('allJobsQueue', { connection });
+
+console.log(`✅ Redis connection established for BullMQ: ${REDIS_HOST}:${REDIS_PORT}`);
+
+// ~/main/backend/queue/queue.js
+
+// ... (existing code at the top, including connection definition)
+
+// Define your queues
+const textQueue = new Queue('textProcessingQueue', { connection });
+const imageQueue = new Queue('imageProcessingQueue', { connection });
+const voiceQueue = new Queue('voiceProcessingQueue', { connection });
+const videoQueue = new Queue('videoProcessingQueue', { connection });
+const allJobsQueue = new Queue('allJobsTrackingQueue', { connection }); // <--- ADD THIS LINE: Define the allJobsQueue
+
+// Initialize QueueSchedulers for each queue
+const textScheduler = new QueueScheduler('textProcessingQueue', { connection });
+const imageScheduler = new QueueScheduler('imageProcessingQueue', { connection });
+const voiceScheduler = new QueueScheduler('voiceProcessingQueue', { connection });
+const videoScheduler = new QueueScheduler('videoProcessingQueue', { connection });
+const allJobsScheduler = new QueueScheduler('allJobsTrackingQueue', { connection }); // <--- ADD THIS LINE: Scheduler for allJobsQueue
+
+console.log('BullMQ Queues and Schedulers initialized.');
+
+module.exports = {
+  textQueue,
+  imageQueue,
+  voiceQueue,
+  videoQueue,
+  allJobsQueue, // <--- ADD THIS LINE: Export allJobsQueue
+  textScheduler,
+  imageScheduler,
+  voiceScheduler,
+  videoScheduler,
+  allJobsScheduler // <--- ADD THIS LINE: Export allJobsScheduler
+};

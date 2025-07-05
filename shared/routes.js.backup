@@ -1,0 +1,27 @@
+const API_ROUTES = {
+  // Authentication routes
+  AUTH: '/api/auth',
+  
+  // Content generation routes
+  AI: '/api/ai',
+  BLOG: '/api/blog',
+  CAPTION: '/api/caption',
+  TEXT_TO_IMAGE: '/api/text-to-image',
+  TEXT_TO_VIDEO: '/api/text-to-video',
+  IMAGE_TO_IMAGE: '/api/image-to-image',
+  VOICE: '/api/voice',
+  
+  // Business content routes
+  COMMERCIAL: '/api/commercial',
+  FLYER: '/api/flyer',
+  FOOD_PROMOS: '/api/food-promos',
+  SOCIAL_MEDIA: '/api/social-media',
+  
+  // Service routes
+  SERVICES: '/api/services',
+  PAYMENTS: '/api/payments',
+  TOURS: '/api/tours',
+  VIDEOS: '/api/videos'
+};
+
+module.exports = { API_ROUTES };

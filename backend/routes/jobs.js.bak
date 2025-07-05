@@ -1,0 +1,81 @@
+// backend/routes/jobs.js
+const express = require('express');
+const router = express.Router();
+const { videoQueue, imageQueue, voiceQueue, textQueue, allJobsQueue } = require('../queue/queue');
+
+// Map the queue name to its queue instance
+const getJobFromSpecificQueue = async (queueName, jobId) => {
+  switch (queueName) {
+    case 'videoProcessingQueue': return videoQueue.getJob(jobId);
+    case 'imageProcessingQueue': return imageQueue.getJob(jobId);
+    case 'voiceProcessingQueue': return voiceQueue.getJob(jobId);
+    case 'textProcessingQueue': return textQueue.getJob(jobId);
+    default: return null;
+  }
+};
+
+// GET /api/jobs/:jobId/status
+router.get('/:jobId/status', async (req, res) => {
+  const { jobId } = req.params;
+
+  try {
+    // Find the tracking job
+    const trackingJob = await allJobsQueue.getJob(jobId);
+    if (!trackingJob) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tracking job not found. It may have expired or been cleaned up.'
+      });
+    }
+
+    const { queue: originalQueueName, jobId: actualJobId } = trackingJob.data;
+    const job = await getJobFromSpecificQueue(originalQueueName, actualJobId);
+
+    // If job is cleaned up but we have returnvalue from tracking queue
+    if (!job && trackingJob.returnvalue) {
+      return res.json({
+        success: true,
+        jobId: trackingJob.id,
+        status: 'completed',
+        progress: 100,
+        result: trackingJob.returnvalue,
+        queueName: originalQueueName,
+        message: 'Job completed and cleaned up from original queue. Returning cached result.'
+      });
+    }
+
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: 'Job not found in original queue.'
+      });
+    }
+
+    const status = await job.getState(); // e.g., 'waiting', 'active', 'completed'
+    const progress = typeof job.progress === 'number' ? job.progress : 0;
+    const result = job.returnvalue || null;
+    const failedReason = job.failedReason || null;
+
+    res.json({
+      success: true,
+      jobId: job.id,
+      status,
+      progress,
+      result,
+      failedReason,
+      queueName: originalQueueName,
+      message: `Job is currently ${status}.`
+    });
+
+  } catch (error) {
+    console.error(`❌ Job status error for ${req.params.jobId}:`, error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error checking job status.',
+      error: error.message
+    });
+  }
+});
+
+module.exports = router;
+

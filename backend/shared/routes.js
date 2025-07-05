@@ -1,0 +1,21 @@
+exports.API_ROUTES = {
+  AUTH: '/api/auth',
+  USER: '/api/user',
+  PAYMENTS: '/api/payments',
+  SERVICES: '/api/services',
+  JOBS: '/api/jobs',
+  CAPTION: '/api/caption',
+  AI: '/api/ai',
+  BLOG: '/api/blog',
+  COMMERCIAL: '/api/commercial',
+  FLYER: '/api/flyer',
+  FOOD_PROMOS: '/api/food-promos',
+  IMAGE_TO_IMAGE: '/api/image-to-image',
+  SOCIAL_MEDIA: '/api/social-media',
+  TEXT_TO_IMAGE: '/api/text-to-image',
+  TEXT_TO_VIDEO: '/api/text-to-video',
+  TOURS: '/api/tours',
+  VIDEOS: '/api/videos',
+  VOICE: '/api/voice',
+  REAL_ESTATE: '/api/real-estate'
+};

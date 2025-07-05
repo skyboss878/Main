@@ -1,0 +1,25 @@
+const { Worker } = require("bullmq");
+const Redis = require("ioredis");
+const aiService = require("../services/aiService");
+
+const connection = new Redis({ maxRetriesPerRequest: null });
+
+const videoWorker = new Worker("videoQueue", async (job) => {
+  try {
+    const { prompt, options } = job.data;
+
+    const script = await aiService.generateVideoScript(
+      prompt,
+      options?.videoOptions?.type || "commercial",
+      options?.videoOptions?.duration || 60
+    );
+
+    const voice = await aiService.generateVoiceover(script);
+    const video = await aiService.generateVideo(script, voice, options);
+
+    return { video };
+  } catch (err) {
+    console.error("Video generation failed:", err);
+    throw err;
+  }
+}, { connection });

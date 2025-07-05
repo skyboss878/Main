@@ -1,33 +1,33 @@
-// backend/queue/queue.js
-const { Queue } = require('bullmq');
-require('dotenv').config({ path: '../.env' }); // Load .env from backend root
+// ~/main/backend/queue/queue.js
+const { Queue, Worker } = require("bullmq");
+const Redis = require('ioredis');
+require('dotenv').config(); // Load environment variables
 
-const REDIS_HOST = process.env.REDIS_HOST || '127.0.0.1';
-const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6379', 10);
-const REDIS_PASSWORD = process.env.REDIS_PASSWORD || null;
+// Ensure Redis connection details are available
+if (!process.env.REDIS_URL) {
+  console.error('❌ CRITICAL: REDIS_URL environment variable is not set. Queues will not function.');
+  process.exit(1); // Exit if Redis URL is missing, as queues are fundamental
+}
 
-const connection = {
-  host: REDIS_HOST,
-  port: REDIS_PORT,
-  password: REDIS_PASSWORD,
-};
+// Establish a single Redis connection for all queues and workers
+// maxRetriesPerRequest: null prevents ioredis from retrying failed commands indefinitely,
+// which can cause issues with BullMQ's handling of job state.
+const connection = new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: null });
 
-// Define different queues for different types of jobs
-const videoQueue = new Queue('videoProcessingQueue', { connection });
+// Define your queues
+const textQueue = new Queue('textProcessingQueue', { connection });
 const imageQueue = new Queue('imageProcessingQueue', { connection });
 const voiceQueue = new Queue('voiceProcessingQueue', { connection });
-const textQueue = new Queue('textProcessingQueue', { connection }); // For blog, captions, descriptions, etc.
+const videoQueue = new Queue('videoProcessingQueue', { connection });
+const allJobsQueue = new Queue('allJobsTrackingQueue', { connection }); // Define the allJobsQueue for tracking
 
-// A single queue to track all jobs if you want to poll generic status
-const allJobsQueue = new Queue('allJobsQueue', { connection });
+// It should ideally run in a separate process in production, but here it's coupled for simplicity.
 
-console.log(`✅ Redis connection established for BullMQ: ${REDIS_HOST}:${REDIS_PORT}`);
 
 module.exports = {
-  videoQueue,
+  textQueue,
   imageQueue,
   voiceQueue,
-  textQueue,
-  allJobsQueue, // Export the queue for overall job tracking
-  connection, // Export connection for workers
+  videoQueue,
+  allJobsQueue, // Export allJobsQueue
 };

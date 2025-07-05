@@ -54,23 +54,35 @@ const aiLimiter = rateLimit({
 
 app.use(compression());
 app.use(helmet()); // Enable Helmet for security headers
+app.use((req, res, next) => {
+  res.setHeader("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' data:; connect-src 'self' https://ai-studio-backend-2.onrender.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'");
+  next();
+});
 
 // CORS configuration
+// ✅ Fixed CORS configuration
 app.use(cors({
+  credentials: true,
   origin: process.env.NODE_ENV === 'production'
-    ? [process.env.FRONTEND_URL, 'https://yourproductiondomain.com'] // !! IMPORTANT: Replace with your actual production frontend URL
+    ? [process.env.FRONTEND_URL, 'https://yourproductiondomain.com']
     : [
         'http://localhost:3000',
         'http://localhost:3001',
         'http://127.0.0.1:3000',
-        'http://192.168.1.26:3000', // Example LAN IP for development
-        'http://192.168.1.26:5173'  // Example LAN IP for Vite preview
+        'http://192.168.1.26:3000',
+        'http://192.168.1.26:5173',
+        'http://localhost:5000' // ✅ add your frontend dev port
       ],
-  credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
 }));
+
+// ✅ Allow credentials explicitly
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Credentials', 'true');
+  next();
+});
 
 // Parsers for request bodies
 app.use(express.json({ limit: '50mb' })); // Increased limit for potential large payloads
@@ -115,6 +127,15 @@ console.log('🔧 Connecting to MongoDB...');
 connectDB();
 console.log('🔧 API_ROUTES object:', JSON.stringify(API_ROUTES, null, 2));
 
+// Start all workers
+require('./workers/textWorker');
+require('./workers/imageWorker');
+require('./workers/voiceWorker');
+require('./workers/videoWorker');
+require('./workers/allJobsWorker'); // <--- ADD THIS LINE
+
+
+
 // Import auth middleware (needed for protected routes)
 const authMiddleware = require('./middleware/authMiddleware'); // Moved up to just before route loading
 
@@ -126,6 +147,8 @@ const routeFiles = [
   { path: API_ROUTES.USER, file: './routes/user', needsAuth: false }, // User specific data, auth handled in user.js
   { path: API_ROUTES.PAYMENTS, file: './routes/payments', needsAuth: false },
   { path: API_ROUTES.SERVICES, file: './routes/services', needsAuth: false }, // General service info like voices
+  { path: API_ROUTES.JOBS, file: './routes/jobs', needsAuth: false }, // Job status polling, specific job checks might be authenticated
+{ path: API_ROUTES.CAPTION, file: './routes/caption', needsAuth: false },
 
   // AI Generation Routes - ALL require authentication and credit checks
   { path: API_ROUTES.AI, file: './routes/ai', needsAuth: true }, // General AI tools (text, image, ideas)
@@ -141,7 +164,6 @@ const routeFiles = [
   { path: API_ROUTES.TOURS, file: './routes/tours', needsAuth: true },
   { path: API_ROUTES.VIDEOS, file: './routes/videos', needsAuth: true },
   { path: API_ROUTES.VOICE, file: './routes/voice', needsAuth: true },
-  { path: API_ROUTES.JOBS, file: './routes/jobs', needsAuth: false }, // Job status polling, specific job checks might be authenticated
   // { path: API_ROUTES.REAL_ESTATE, file: './routes/real-estate', needsAuth: true }, // Uncomment if you add this
 ];
 
@@ -175,6 +197,7 @@ for (const { path, file, needsAuth } of routeFiles) {
 console.log('🔧 API routes loaded, setting up frontend serving...');
 
 // Serve static frontend files from Vite build (AFTER API routes are defined)
+// This should handle the root route '/' and any sub-routes your React app handles.
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
 // Health check endpoint
@@ -182,29 +205,33 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// React Router fallback - serve index.html for any non-API or static routes
-app.get('*', (req, res, next) => {
-  // Skip API routes, static upload/temp routes - they should have been handled above
+// React Router fallback - serve index.html for any non-API or non-static-file routes
+// This MUST be the very last middleware before the 404 middleware.
+app.use((req, res, next) => { // FIXED: Changed from app.get('*', ...) to app.use(...)
+  // Exclude API routes and known static paths from being served as index.html
   if (req.originalUrl.startsWith('/api') || req.originalUrl.startsWith('/uploads') || req.originalUrl.startsWith('/temp')) {
-    return next(); // Let it fall through to 404
+    return next(); // Let Express continue to process or fall through to 404
   }
   console.log(`🔧 Serving React app for: ${req.originalUrl}`);
   res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
 });
 
-// 404 fallback for API routes that weren't found
+// 404 fallback for API routes that weren't found or other unhandled requests
+// This MUST be the very last middleware.
 app.use((req, res) => {
   console.log(`🔧 404 fallback hit for: ${req.originalUrl}`);
   res.status(404).json({ success: false, message: 'Route not found' });
 });
 
+
 console.log('🔧 Starting server...');
 
 // Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log('🔧 Server startup complete!');
   console.log(`📱 Frontend available at: http://localhost:${PORT}`);
   console.log(`🔌 API endpoints available at: http://localhost:${PORT}/api/*`);
 });
+require('./workers/videoWorker');

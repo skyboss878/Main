@@ -1,0 +1,118 @@
+// ~/main/backend/queue/queue.js
+const { Queue } = require('bullmq'); // Remove QueueScheduler - it's deprecated in newer versions
+const Redis = require('ioredis');
+require('dotenv').config();
+
+const connection = new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: null });
+
+// Define your queues
+const textQueue = new Queue('textProcessingQueue', { connection });
+const imageQueue = new Queue('imageProcessingQueue', { connection });
+const voiceQueue = new Queue('voiceProcessingQueue', { connection });
+const videoQueue = new Queue('videoProcessingQueue', { connection });
+const allJobsQueue = new Queue('allJobsTrackingQueue', { connection });
+
+// QueueScheduler is deprecated in newer BullMQ versions
+// The Queue itself now handles scheduling automatically
+// If you need delayed jobs, just use: queue.add('jobName', data, { delay: 5000 })
+
+console.log('BullMQ Queues initialized.');
+
+module.exports = {
+  textQueue,
+  imageQueue,
+  voiceQueue,
+  videoQueue,
+  allJobsQueue,
+  connection,
+  
+  // Helper function to add jobs with proper error handling
+  addJob: async (queueName, jobName, data, options = {}) => {
+    try {
+      let queue;
+      switch (queueName) {
+        case 'text':
+          queue = textQueue;
+          break;
+        case 'image':
+          queue = imageQueue;
+          break;
+        case 'voice':
+          queue = voiceQueue;
+          break;
+        case 'video':
+          queue = videoQueue;
+          break;
+        case 'allJobs':
+          queue = allJobsQueue;
+          break;
+        default:
+          throw new Error(`Unknown queue: ${queueName}`);
+      }
+      
+      const job = await queue.add(jobName, data, {
+        removeOnComplete: 10,
+        removeOnFail: 5,
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000,
+        },
+        ...options
+      });
+      
+      console.log(`Job ${job.id} added to ${queueName} queue`);
+      return job;
+    } catch (error) {
+      console.error(`Failed to add job to ${queueName} queue:`, error);
+      throw error;
+    }
+  },
+  
+  // Helper function to get job status
+  getJobStatus: async (queueName, jobId) => {
+    try {
+      let queue;
+      switch (queueName) {
+        case 'text':
+          queue = textQueue;
+          break;
+        case 'image':
+          queue = imageQueue;
+          break;
+        case 'voice':
+          queue = voiceQueue;
+          break;
+        case 'video':
+          queue = videoQueue;
+          break;
+        case 'allJobs':
+          queue = allJobsQueue;
+          break;
+        default:
+          throw new Error(`Unknown queue: ${queueName}`);
+      }
+      
+      const job = await queue.getJob(jobId);
+      if (!job) {
+        return { status: 'not_found' };
+      }
+      
+      return {
+        id: job.id,
+        name: job.name,
+        data: job.data,
+        status: await job.getState(),
+        progress: job.progress,
+        returnValue: job.returnvalue,
+        failedReason: job.failedReason,
+        createdAt: job.timestamp,
+        processedAt: job.processedOn,
+        finishedAt: job.finishedOn,
+      };
+    } catch (error) {
+      console.error(`Failed to get job status from ${queueName} queue:`, error);
+      throw error;
+    }
+  }
+};

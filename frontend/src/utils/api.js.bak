@@ -1,0 +1,152 @@
+// src/utils/api.js
+import api from '../services/apiService.js'; // This is your axios instance with interceptors
+
+// Centralized API Routes configuration
+const API_ROUTES = {
+  AUTH: '/api/auth',
+  AI: '/api/ai', // General AI service, e.g., /api/ai/generate-text, /api/ai/generate-image
+  BLOG: '/api/blog',
+  CAPTION: '/api/caption',
+  TEXT_TO_IMAGE: '/api/text-to-image',
+  TEXT_TO_VIDEO: '/api/text-to-video',
+  IMAGE_TO_IMAGE: '/api/image-to-image',
+  VOICE: '/api/voice',
+  COMMERCIAL: '/api/commercial', // For non-video commercial tools or fallback
+  FLYER: '/api/flyer',
+  FOOD_PROMOS: '/api/food-promos',
+  SOCIAL_MEDIA: '/api/social-media', // For general social media posts (text/image)
+  SERVICES: '/api/services', // For fetching AI service options (e.g. voices, models)
+  PAYMENTS: '/api/payments',
+  TOURS: '/api/tours',
+  VIDEOS: '/api/videos', // Base for video generation types (social-media, commercial, product-showcase)
+  USER: '/api/user', // NEW: For user-specific data like credits
+  JOBS: '/api/jobs', // For polling job status
+  REAL_ESTATE: '/api/real-estate' // Placeholder, implement backend route if needed
+};
+
+// Helper functions for specific API calls
+// Authentication API
+export const authApi = {
+  login: (credentials) => api.post(API_ROUTES.AUTH + "/login", credentials),
+  signup: (userData) => api.post(API_ROUTES.AUTH + "/signup", userData),
+  logout: () => api.post(API_ROUTES.AUTH + "/logout"),
+  // profile: () => api.get(API_ROUTES.AUTH + "/profile") // Uncomment if you implement protected profile route
+};
+
+export const apiUtils = {
+  // General AI Services (via /api/ai)
+  generateText: (prompt, options) => api.post(`${API_ROUTES.AI}/generate-text`, { prompt, options }),
+  generateImage: (prompt, options) => api.post(`${API_ROUTES.AI}/generate-image`, { prompt, options }),
+  generateIdeas: (type, keywords, tone) => api.post(`${API_ROUTES.AI}/generate-ideas`, { type, keywords, tone }),
+
+  // Video Generation (via /api/videos)
+  generateSocialMediaVideo: (data) => api.post(`${API_ROUTES.VIDEOS}/social-media`, data),
+  generateCommercialVideo: (data) => api.post(`${API_ROUTES.VIDEOS}/commercial`, data),
+  generateProductShowcase: (data) => api.post(`${API_ROUTES.VIDEOS}/product-showcase`, data),
+  textToVideo: (data) => api.post(API_ROUTES.TEXT_TO_VIDEO, data),
+
+  // Image Generation (Specific tools)
+  textToImage: (data) => api.post(API_ROUTES.TEXT_TO_IMAGE, data),
+  imageToImage: (data) => api.post(API_ROUTES.IMAGE_TO_IMAGE, data),
+
+  // Voice Generation
+  generateVoice: (data) => api.post(API_ROUTES.VOICE, data),
+  getAvailableVoices: () => api.get(`${API_ROUTES.SERVICES}/voices`), // Call to get voice list
+
+  // Caption Generation
+  generateCaption: (data) => api.post(API_ROUTES.CAPTION, data),
+
+  // Blog Creation
+  createBlog: (data) => api.post(API_ROUTES.BLOG, data),
+
+  // Flyer and Food Promo Generation
+  generateFlyer: (data) => api.post(API_ROUTES.FLYER, data),
+  generateFoodPromo: (data) => api.post(API_ROUTES.FOOD_PROMOS, data),
+
+  // Social Media Content (General)
+  createSocialContent: (data) => api.post(API_ROUTES.SOCIAL_MEDIA, data),
+
+  // Tour Creation
+  createTour: (data) => api.post(API_ROUTES.TOURS, data),
+
+  // User Management (NEW)
+  getCredits: () => api.get(`${API_ROUTES.USER}/credits`), // Fetch user credits
+  getUserProfile: () => api.get(`${API_ROUTES.USER}/me`), // Fetch full user profile
+
+  // Payments
+  createPaymentOrder: (data) => api.post(`${API_ROUTES.PAYMENTS}/create-order`, data),
+  capturePaymentOrder: (data) => api.post(`${API_ROUTES.PAYMENTS}/capture-order`, data),
+
+  // Job Status
+  getJobStatus: (jobId) => api.get(`${API_ROUTES.JOBS}/${jobId}/status`),
+};
+
+// Error handling helper (good as is)
+export const handleApiError = (error, defaultMessage = 'An error occurred') => {
+  if (error.response) {
+    const message = error.response.data?.message || error.response.data?.error || defaultMessage;
+    return {
+      message,
+      status: error.response.status,
+      data: error.response.data
+    };
+  } else if (error.request) {
+    return {
+      message: 'No response from server. Please check your connection.',
+      status: 0,
+      data: null
+    };
+  } else {
+    return {
+      message: error.message || defaultMessage,
+      status: null,
+      data: null
+    };
+  }
+};
+
+export default api;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
